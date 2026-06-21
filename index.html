@@ -1,0 +1,2273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoPilot — Your AI Sustainability Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   ECOPILOT DESIGN TOKENS
+   ============================================================ */
+:root{
+  /* Core palette — functional, not decorative */
+  --slate-950:#0A0F0D;
+  --slate-900:#0F1714;
+  --slate-850:#13201B;
+  --slate-800:#1A2A23;
+  --slate-700:#26392F;
+  --slate-600:#3A5347;
+  --slate-500:#557060;
+  --slate-400:#82998C;
+  --slate-300:#AEC0B4;
+  --slate-200:#D2DED7;
+  --slate-100:#E9F0EA;
+
+  --white:#FAFCF9;
+
+  --emerald:#10B981;
+  --emerald-bright:#34D399;
+  --emerald-dim:#0B7A56;
+  --emerald-glow:rgba(16,185,129,0.35);
+
+  --teal:#14B8A6;
+  --teal-bright:#2DD4BF;
+  --teal-dim:#0E8074;
+
+  --amber:#F5A623;       /* reserved exclusively for carbon-impact / warning readouts */
+  --amber-bright:#FFC857;
+  --coral:#FF6B5E;       /* reserved exclusively for high-impact / negative deltas */
+
+  --font-display:'Space Grotesk', sans-serif;
+  --font-body:'Inter', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+
+  --radius-sm:10px;
+  --radius-md:16px;
+  --radius-lg:24px;
+  --radius-xl:32px;
+
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family:var(--font-body);
+  background:var(--slate-950);
+  color:var(--slate-100);
+  min-height:100vh;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+img,svg{display:block;max-width:100%;}
+button{font-family:inherit;cursor:pointer;}
+a{color:inherit;text-decoration:none;}
+::selection{background:var(--emerald);color:var(--slate-950);}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;scroll-behavior:auto !important;}
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-track{background:var(--slate-900);}
+::-webkit-scrollbar-thumb{background:var(--slate-700);border-radius:8px;}
+::-webkit-scrollbar-thumb:hover{background:var(--emerald-dim);}
+
+/* ============================================================
+   LAYOUT SHELL
+   ============================================================ */
+#app{position:relative;min-height:100vh;}
+
+.bg-field{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 900px 600px at 15% -10%, rgba(16,185,129,0.16), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 90% 10%, rgba(20,184,166,0.12), transparent 60%),
+    radial-gradient(ellipse 800px 800px at 50% 110%, rgba(16,185,129,0.08), transparent 60%),
+    var(--slate-950);
+}
+.grain{
+  position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0.035;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.screen{
+  position:relative;z-index:2;min-height:100vh;display:none;
+  animation:screenIn .5s var(--ease);
+}
+.screen.active{display:block;}
+@keyframes screenIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px;}
+@media (max-width:640px){.wrap{padding:0 18px;}}
+
+/* ============================================================
+   NAV
+   ============================================================ */
+.topnav{
+  position:sticky;top:0;z-index:40;
+  background:rgba(10,15,13,0.78);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.topnav .wrap{display:flex;align-items:center;justify-content:space-between;height:72px;}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:1.15rem;letter-spacing:-0.02em;}
+.brand-mark{width:34px;height:34px;flex-shrink:0;}
+.nav-steps{display:flex;align-items:center;gap:4px;}
+.nav-step{
+  font-family:var(--font-mono);font-size:0.68rem;letter-spacing:0.04em;
+  padding:7px 13px;border-radius:99px;color:var(--slate-400);
+  border:1px solid transparent;transition:all .25s var(--ease);
+  display:flex;align-items:center;gap:6px;background:none;
+}
+.nav-step .dot{width:5px;height:5px;border-radius:50%;background:var(--slate-600);transition:all .25s var(--ease);}
+.nav-step.done{color:var(--emerald-bright);}
+.nav-step.done .dot{background:var(--emerald);}
+.nav-step.current{color:var(--white);border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.08);}
+.nav-step.current .dot{background:var(--emerald-bright);box-shadow:0 0 8px var(--emerald-glow);}
+.nav-step.locked{opacity:0.4;cursor:not-allowed;}
+.nav-step:not(.locked):hover{color:var(--white);}
+@media (max-width:980px){.nav-steps{display:none;}}
+
+.nav-right{display:flex;align-items:center;gap:14px;}
+.streak-pill{
+  display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:0.78rem;
+  background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.25);color:var(--amber-bright);
+  padding:6px 12px;border-radius:99px;
+}
+.points-pill{
+  display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:0.78rem;
+  background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);color:var(--emerald-bright);
+  padding:6px 12px;border-radius:99px;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn{
+  font-family:var(--font-display);font-weight:600;font-size:0.95rem;
+  padding:14px 28px;border-radius:99px;border:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .2s var(--ease), box-shadow .2s var(--ease), background .2s var(--ease);
+  white-space:nowrap;
+}
+.btn-primary{
+  background:linear-gradient(135deg, var(--emerald-bright), var(--teal));
+  color:var(--slate-950);
+  box-shadow:0 8px 24px -8px var(--emerald-glow);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 32px -8px var(--emerald-glow);}
+.btn-primary:active{transform:translateY(0);}
+.btn-ghost{
+  background:rgba(255,255,255,0.04);color:var(--white);border:1px solid rgba(255,255,255,0.12);
+}
+.btn-ghost:hover{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2);}
+.btn-sm{padding:9px 18px;font-size:0.82rem;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none !important;}
+.btn-block{width:100%;}
+.btn-icon{width:42px;height:42px;border-radius:50%;padding:0;flex-shrink:0;}
+
+/* ============================================================
+   CARDS / SURFACES
+   ============================================================ */
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015));
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:var(--radius-lg);
+  padding:28px;
+}
+.card-hover{transition:transform .3s var(--ease), border-color .3s var(--ease);}
+.card-hover:hover{transform:translateY(-4px);border-color:rgba(16,185,129,0.3);}
+
+.eyebrow{
+  font-family:var(--font-mono);font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--emerald-bright);display:flex;align-items:center;gap:8px;margin-bottom:14px;
+}
+.eyebrow::before{content:'';width:18px;height:1px;background:var(--emerald);}
+
+h1,h2,h3,h4{font-family:var(--font-display);letter-spacing:-0.02em;color:var(--white);line-height:1.1;}
+.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+
+/* Toast */
+#toast-stack{position:fixed;bottom:24px;right:24px;z-index:200;display:flex;flex-direction:column;gap:10px;align-items:flex-end;}
+.toast{
+  font-family:var(--font-body);font-size:0.88rem;font-weight:600;color:var(--slate-950);
+  background:linear-gradient(135deg,var(--emerald-bright),var(--teal));
+  padding:14px 20px;border-radius:14px;box-shadow:0 12px 30px -8px rgba(0,0,0,0.5);
+  display:flex;align-items:center;gap:10px;
+  animation:toastIn .35s var(--ease);max-width:340px;
+}
+.toast.warn{background:linear-gradient(135deg,var(--amber-bright),var(--amber));}
+@keyframes toastIn{from{opacity:0;transform:translateX(40px) scale(.95);}to{opacity:1;transform:translateX(0) scale(1);}}
+.toast.out{animation:toastOut .3s var(--ease) forwards;}
+@keyframes toastOut{to{opacity:0;transform:translateX(40px);}}
+
+/* Loading */
+.spinner{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);border-top-color:#fff;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Focus visibility */
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
+  outline:2px solid var(--emerald-bright);outline-offset:3px;
+}
+
+footer.app-footer{position:relative;z-index:2;border-top:1px solid rgba(255,255,255,0.06);padding:32px 0;margin-top:80px;}
+footer.app-footer .wrap{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
+.foot-text{font-family:var(--font-mono);font-size:0.72rem;color:var(--slate-500);}
+</style>
+</head>
+<body>
+
+<div class="bg-field"></div>
+<div class="grain"></div>
+
+<div id="app">
+  <!-- NAV -->
+  <nav class="topnav" id="topnav">
+    <div class="wrap">
+      <div class="brand" id="brand-home-link" style="cursor:pointer;">
+        <svg class="brand-mark" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="34" y2="34"><stop stop-color="#34D399"/><stop offset="1" stop-color="#14B8A6"/></linearGradient>
+          </defs>
+          <circle cx="17" cy="17" r="16" fill="url(#bg)" fill-opacity="0.14"/>
+          <path d="M17 4C17 4 27 9 27 18.5C27 24.3 22.5 29 17 29C11.5 29 7 24.3 7 18.5C7 9 17 4 17 4Z" fill="url(#bg)"/>
+          <path d="M9 19L13.5 19L15.5 14L18 23L20 17L22 19L25 19" stroke="#0A0F0D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>EcoPilot</span>
+      </div>
+      <div class="nav-steps" id="nav-steps"></div>
+      <div class="nav-right" id="nav-right"></div>
+    </div>
+  </nav>
+
+  <!-- SCREENS MOUNT HERE -->
+  <main id="screens"></main>
+
+  <footer class="app-footer">
+    <div class="wrap">
+      <span class="foot-text">ECOPILOT · AI SUSTAINABILITY COACH</span>
+      <span class="foot-text" id="footer-status">DATA STORED LOCALLY ON THIS DEVICE</span>
+    </div>
+  </footer>
+</div>
+
+<div id="toast-stack"></div>
+
+<script>
+/* ============================================================
+   ECOPILOT — APPLICATION ENGINE
+   Real client-side state, scoring, and persistence.
+   ============================================================ */
+
+const STORAGE_PREFIX = 'ecopilot_state_v1__'; // per-account state, keyed by user id
+const ACCOUNTS_KEY = 'ecopilot_accounts_v1';   // registry of all local accounts
+const SESSION_KEY = 'ecopilot_session_v1';     // currently logged-in user id
+
+/* ------------------------------------------------------------
+   ACCOUNTS / AUTH
+   Client-side only — accounts and sessions live in this browser's
+   localStorage. Good enough for a real, working multi-user login
+   flow on a static site; not a substitute for a server-backed
+   auth system, since anyone with device access can read storage.
+   ------------------------------------------------------------ */
+
+function loadAccounts(){
+  try{
+    const raw = localStorage.getItem(ACCOUNTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+function saveAccounts(accounts){
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
+// Lightweight, dependency-free string hash (djb2) + salt, repeated rounds.
+// Not cryptographically strong — fine for a local-only demo account
+// system where the threat model is "don't store the raw password".
+function hashPassword(password, salt){
+  let str = salt + ':' + password;
+  let hash = 5381;
+  for(let round=0; round<3; round++){
+    let h = hash;
+    for(let i=0;i<str.length;i++){
+      h = ((h<<5)+h+str.charCodeAt(i)) >>> 0;
+    }
+    hash = h;
+    str = h.toString(16)+str;
+  }
+  return hash.toString(16);
+}
+function makeSalt(){
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function normalizeEmail(email){
+  return email.trim().toLowerCase();
+}
+
+function signup(name, email, password){
+  const accounts = loadAccounts();
+  const key = normalizeEmail(email);
+  if(!name.trim()) return {ok:false, error:'Please enter your name.'};
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key)) return {ok:false, error:'Please enter a valid email address.'};
+  if(password.length < 6) return {ok:false, error:'Password must be at least 6 characters.'};
+  if(accounts[key]) return {ok:false, error:'An account with that email already exists. Try logging in instead.'};
+
+  const salt = makeSalt();
+  const userId = 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  accounts[key] = { userId, name:name.trim(), email:key, salt, passwordHash:hashPassword(password, salt), createdAt:new Date().toISOString() };
+  saveAccounts(accounts);
+
+  // initialize fresh per-account state
+  const fresh = structuredClone(DEFAULT_STATE);
+  fresh.profile.name = name.trim();
+  localStorage.setItem(STORAGE_PREFIX + userId, JSON.stringify(fresh));
+
+  startSession(userId);
+  return {ok:true, userId};
+}
+
+function login(email, password){
+  const accounts = loadAccounts();
+  const key = normalizeEmail(email);
+  const account = accounts[key];
+  if(!account) return {ok:false, error:'No account found with that email. Try signing up instead.'};
+  const hash = hashPassword(password, account.salt);
+  if(hash !== account.passwordHash) return {ok:false, error:'Incorrect password. Please try again.'};
+  startSession(account.userId);
+  return {ok:true, userId:account.userId};
+}
+
+function startSession(userId){
+  localStorage.setItem(SESSION_KEY, userId);
+  STATE = loadState();
+}
+function getSession(){
+  return localStorage.getItem(SESSION_KEY);
+}
+function logout(){
+  localStorage.removeItem(SESSION_KEY);
+  STATE = structuredClone(DEFAULT_STATE);
+  navigate('auth');
+}
+function currentAccount(){
+  const userId = getSession();
+  if(!userId) return null;
+  const accounts = loadAccounts();
+  return Object.values(accounts).find(a=>a.userId===userId) || null;
+}
+
+const DEFAULT_STATE = {
+  onboarded:false,
+  profile:{ name:'', region:'global' },
+  assessment:{
+    completed:false,
+    answers:{}, // per question id
+  },
+  scores:{
+    total:0,            // 0-100 EcoScore (higher = better)
+    annualCO2:0,         // kg CO2e / year
+    categories:{ transport:0, home:0, food:0, consumption:0 }, // kg CO2e/year each
+  },
+  missions:{
+    active:[],
+    completed:[],
+    skipped:[],
+  },
+  points:0,
+  streak:{ current:0, longest:0, lastCheckIn:null },
+  history:[], // {date, totalCO2, score} snapshots for trend chart
+  chat:[],    // {role, text, time}
+  reports:[], // generated weekly reports
+  achievements:[], // unlocked achievement ids
+  currentScreen:'landing',
+};
+
+let STATE = loadState();
+
+function currentStorageKey(){
+  const userId = getSession();
+  return userId ? (STORAGE_PREFIX + userId) : null;
+}
+
+function loadState(){
+  try{
+    const key = currentStorageKey();
+    if(!key) return structuredClone(DEFAULT_STATE);
+    const raw = localStorage.getItem(key);
+    if(!raw) return structuredClone(DEFAULT_STATE);
+    const parsed = JSON.parse(raw);
+    return Object.assign(structuredClone(DEFAULT_STATE), parsed);
+  }catch(e){
+    return structuredClone(DEFAULT_STATE);
+  }
+}
+function saveState(){
+  const key = currentStorageKey();
+  if(!key) return; // not logged in — nothing to persist to
+  localStorage.setItem(key, JSON.stringify(STATE));
+}
+function resetState(){
+  const key = currentStorageKey();
+  if(key) localStorage.removeItem(key);
+  STATE = structuredClone(DEFAULT_STATE);
+  saveState();
+  navigate('landing');
+}
+
+/* ============================================================
+   TOAST SYSTEM
+   ============================================================ */
+function toast(msg, opts={}){
+  const stack = document.getElementById('toast-stack');
+  const el = document.createElement('div');
+  el.className = 'toast' + (opts.warn ? ' warn' : '');
+  el.innerHTML = `<span>${opts.icon || '✓'}</span><span>${msg}</span>`;
+  stack.appendChild(el);
+  setTimeout(()=>{
+    el.classList.add('out');
+    setTimeout(()=>el.remove(), 320);
+  }, opts.duration || 3200);
+}
+
+/* ============================================================
+   CARBON SCORING ENGINE
+   Baseline figures approximate published US/global per-capita
+   averages (EPA / Our World in Data orders of magnitude), used
+   as fixed reference points so the assessment produces
+   consistent, explainable deltas rather than arbitrary numbers.
+   Units: kg CO2e per year.
+   ============================================================ */
+
+const GLOBAL_AVG_CO2 = 4800;   // kg CO2e/year, world average per capita
+const US_AVG_CO2     = 16000;  // kg CO2e/year, US average per capita
+const TARGET_2030     = 2300;  // kg CO2e/year, Paris-aligned individual target
+
+const CATEGORY_WEIGHTS = { transport:0.32, home:0.27, food:0.23, consumption:0.18 };
+
+// Assessment questions — each option carries a kg CO2e/year contribution per category.
+const ASSESSMENT_QUESTIONS = [
+  {
+    id:'commute',
+    category:'transport',
+    q:'How do you usually get around day-to-day?',
+    help:'Your primary mode for commuting and errands.',
+    options:[
+      {v:'car_solo', label:'Drive alone (gas car)', co2:4200, icon:'🚗'},
+      {v:'car_ev', label:'Drive alone (electric car)', co2:1400, icon:'🔋'},
+      {v:'carpool', label:'Carpool / rideshare', co2:2100, icon:'🚙'},
+      {v:'transit', label:'Public transit', co2:900, icon:'🚆'},
+      {v:'active', label:'Walk / bike', co2:50, icon:'🚲'},
+    ]
+  },
+  {
+    id:'flights',
+    category:'transport',
+    q:'How many flights do you take per year?',
+    help:'Round trips, any distance.',
+    options:[
+      {v:'0', label:'None', co2:0, icon:'🌍'},
+      {v:'1-2', label:'1–2 short-haul flights', co2:600, icon:'✈️'},
+      {v:'3-5', label:'3–5 flights, some long-haul', co2:2200, icon:'🛫'},
+      {v:'6+', label:'6+ flights / frequent long-haul', co2:4800, icon:'🌐'},
+    ]
+  },
+  {
+    id:'home_type',
+    category:'home',
+    q:'What best describes your home energy setup?',
+    help:'Helps estimate your heating, cooling and electricity footprint.',
+    options:[
+      {v:'efficient', label:'Renewable / solar-powered, efficient home', co2:600, icon:'☀️'},
+      {v:'apartment', label:'Apartment, shared utilities', co2:1500, icon:'🏢'},
+      {v:'house_avg', label:'House, standard grid electricity', co2:3200, icon:'🏠'},
+      {v:'house_large', label:'Large home, gas heating, high usage', co2:5400, icon:'🏡'},
+    ]
+  },
+  {
+    id:'household_size',
+    category:'home',
+    q:'How many people share your household?',
+    help:'Larger households split fixed home emissions more ways.',
+    options:[
+      {v:'1', label:'Just me', co2:1.0, icon:'👤', multiplier:true},
+      {v:'2', label:'2 people', co2:0.62, icon:'👥', multiplier:true},
+      {v:'3-4', label:'3–4 people', co2:0.42, icon:'👨‍👩‍👧', multiplier:true},
+      {v:'5+', label:'5+ people', co2:0.30, icon:'👨‍👩‍👧‍👦', multiplier:true},
+    ]
+  },
+  {
+    id:'diet',
+    category:'food',
+    q:'Which best describes your diet?',
+    help:'Food production is a major, often-overlooked emissions source.',
+    options:[
+      {v:'vegan', label:'Vegan', co2:1100, icon:'🌱'},
+      {v:'vegetarian', label:'Vegetarian', co2:1500, icon:'🥗'},
+      {v:'flex', label:'Flexitarian / mostly plant-based', co2:2000, icon:'🥦'},
+      {v:'omnivore', label:'Balanced omnivore', co2:2700, icon:'🍽️'},
+      {v:'meat_heavy', label:'Meat with most meals', co2:3700, icon:'🥩'},
+    ]
+  },
+  {
+    id:'food_sourcing',
+    category:'food',
+    q:'How much of your food is local / minimally processed?',
+    help:'Transport and packaging add hidden emissions.',
+    options:[
+      {v:'mostly_local', label:'Mostly local & seasonal', co2:200, icon:'🧺'},
+      {v:'mixed', label:'A healthy mix', co2:450, icon:'🛒'},
+      {v:'mostly_packaged', label:'Mostly packaged / imported', co2:800, icon:'📦'},
+    ]
+  },
+  {
+    id:'shopping',
+    category:'consumption',
+    q:'How would you describe your shopping habits?',
+    help:'New goods carry the emissions of manufacturing and shipping.',
+    options:[
+      {v:'minimal', label:'Buy rarely, secondhand when I can', co2:400, icon:'♻️'},
+      {v:'moderate', label:'Moderate, mostly necessities', co2:1100, icon:'🛍️'},
+      {v:'frequent', label:'Frequent shopper, like new things', co2:2200, icon:'🛒'},
+      {v:'heavy', label:'Heavy consumer, fast fashion / gadgets', co2:3600, icon:'📱'},
+    ]
+  },
+  {
+    id:'waste',
+    category:'consumption',
+    q:'How do you handle waste and recycling?',
+    help:'Diverting waste from landfill reduces methane emissions.',
+    options:[
+      {v:'compost', label:'Compost + recycle almost everything', co2:150, icon:'🌿'},
+      {v:'recycle', label:'Recycle regularly', co2:400, icon:'♻️'},
+      {v:'some', label:'Recycle occasionally', co2:750, icon:'🗑️'},
+      {v:'none', label:'Mostly landfill', co2:1100, icon:'🚮'},
+    ]
+  },
+];
+
+function computeAssessment(answers){
+  const categories = { transport:0, home:0, food:0, consumption:0 };
+  let householdMultiplier = 1;
+
+  ASSESSMENT_QUESTIONS.forEach(q=>{
+    const ans = answers[q.id];
+    if(!ans) return;
+    const opt = q.options.find(o=>o.v===ans);
+    if(!opt) return;
+    if(opt.multiplier){ householdMultiplier = opt.co2; return; }
+    categories[q.category] += opt.co2;
+  });
+
+  // Apply household sharing multiplier only to home category (shared fixed costs)
+  categories.home = categories.home * householdMultiplier;
+
+  const annualCO2 = Math.round(Object.values(categories).reduce((a,b)=>a+b,0));
+
+  // EcoScore: 0-100 scale, piecewise so reference points are mutually consistent
+  // with the "vs global average" stat shown alongside it:
+  // TARGET_2030 -> 95 (excellent), GLOBAL_AVG -> 50 (the true midpoint), US_AVG -> 20 (poor)
+  let score;
+  if(annualCO2 <= TARGET_2030){
+    score = 95 + ((TARGET_2030 - annualCO2) / TARGET_2030) * 4;
+  } else if(annualCO2 <= GLOBAL_AVG_CO2){
+    score = 95 - ((annualCO2 - TARGET_2030) / (GLOBAL_AVG_CO2 - TARGET_2030)) * 45;
+  } else if(annualCO2 <= US_AVG_CO2){
+    score = 50 - ((annualCO2 - GLOBAL_AVG_CO2) / (US_AVG_CO2 - GLOBAL_AVG_CO2)) * 30;
+  } else {
+    score = 20 - ((annualCO2 - US_AVG_CO2) / US_AVG_CO2) * 17;
+  }
+  score = Math.max(3, Math.min(99, Math.round(score)));
+
+  return { total:score, annualCO2, categories };
+}
+
+function co2ToTrees(kg){ return Math.round(kg / 21); } // ~21kg CO2 absorbed per tree/year
+function co2ToCarMiles(kg){ return Math.round(kg / 0.404); } // kg CO2 per mile, avg car
+function percentVsAverage(kg){ return Math.round(((GLOBAL_AVG_CO2 - kg) / GLOBAL_AVG_CO2) * 100); }
+
+/* ============================================================
+   MISSIONS ENGINE
+   Mission pool tagged by category; selection is driven by the
+   user's actual highest-impact categories so recommendations
+   are personalized rather than generic.
+   ============================================================ */
+
+const MISSION_POOL = [
+  // Transport
+  {id:'m_bike_commute', category:'transport', difficulty:'medium', points:120, co2Saved:380,
+    title:'Bike or walk one commute a week', desc:'Swap one car commute for active transport this week.', icon:'🚲'},
+  {id:'m_carpool', category:'transport', difficulty:'easy', points:60, co2Saved:180,
+    title:'Carpool twice this week', desc:'Share a ride with a colleague or neighbor for two trips.', icon:'🚙'},
+  {id:'m_transit_day', category:'transport', difficulty:'easy', points:50, co2Saved:140,
+    title:'Take transit instead of driving once', desc:'Pick one day to leave the car at home.', icon:'🚆'},
+  {id:'m_tire_check', category:'transport', difficulty:'easy', points:30, co2Saved:60,
+    title:'Check your tire pressure', desc:'Underinflated tires waste fuel — a 5-minute fix.', icon:'⛽'},
+  {id:'m_flight_offset', category:'transport', difficulty:'hard', points:200, co2Saved:600,
+    title:'Offset your next flight', desc:'Calculate and offset emissions from an upcoming trip.', icon:'✈️'},
+
+  // Home
+  {id:'m_thermostat', category:'home', difficulty:'easy', points:50, co2Saved:160,
+    title:'Lower your thermostat 2°', desc:'A small adjustment that adds up fast over a week.', icon:'🌡️'},
+  {id:'m_led_swap', category:'home', difficulty:'easy', points:40, co2Saved:90,
+    title:'Swap 3 bulbs to LED', desc:'LEDs use up to 75% less energy than incandescent bulbs.', icon:'💡'},
+  {id:'m_unplug', category:'home', difficulty:'easy', points:35, co2Saved:70,
+    title:'Unplug standby electronics tonight', desc:'Phantom power draw adds up — unplug what you can.', icon:'🔌'},
+  {id:'m_cold_wash', category:'home', difficulty:'medium', points:70, co2Saved:150,
+    title:'Wash laundry on cold for a week', desc:'Heating water is most of a wash cycle\'s energy use.', icon:'🧺'},
+  {id:'m_solar_research', category:'home', difficulty:'hard', points:180, co2Saved:0,
+    title:'Research solar options for your home', desc:'Look into incentives and providers in your area.', icon:'☀️'},
+
+  // Food
+  {id:'m_meatless_3', category:'food', difficulty:'medium', points:100, co2Saved:280,
+    title:'Eat 3 plant-based dinners this week', desc:'Swap meat for plant protein three nights this week.', icon:'🥦'},
+  {id:'m_local_produce', category:'food', difficulty:'easy', points:45, co2Saved:90,
+    title:'Buy from a local market once', desc:'Cut food-mile emissions with one local grocery trip.', icon:'🧺'},
+  {id:'m_food_waste', category:'food', difficulty:'medium', points:80, co2Saved:200,
+    title:'Plan meals to cut food waste', desc:'Plan this week\'s meals to use what you already have.', icon:'📋'},
+  {id:'m_no_food_delivery', category:'food', difficulty:'easy', points:40, co2Saved:60,
+    title:'Skip food delivery packaging once', desc:'Cook or dine in instead of ordering delivery once this week.', icon:'🍳'},
+
+  // Consumption
+  {id:'m_secondhand', category:'consumption', difficulty:'medium', points:90, co2Saved:220,
+    title:'Buy one item secondhand', desc:'Find your next purchase used instead of new.', icon:'♻️'},
+  {id:'m_no_buy_week', category:'consumption', difficulty:'hard', points:150, co2Saved:340,
+    title:'Try a no-new-purchases week', desc:'A full week buying only essentials.', icon:'🛑'},
+  {id:'m_recycle_audit', category:'consumption', difficulty:'easy', points:35, co2Saved:50,
+    title:'Audit your recycling habits', desc:'Check local rules — many households recycle incorrectly.', icon:'🔍'},
+  {id:'m_repair', category:'consumption', difficulty:'medium', points:85, co2Saved:140,
+    title:'Repair instead of replace', desc:'Fix one item this week instead of buying new.', icon:'🧵'},
+  {id:'m_reusable_bag', category:'consumption', difficulty:'easy', points:25, co2Saved:20,
+    title:'Bring reusable bags every trip', desc:'Skip single-use bags on every shop this week.', icon:'🛍️'},
+];
+
+const ACHIEVEMENTS = [
+  {id:'a_first_step', title:'First Step', desc:'Completed your carbon assessment', icon:'🌱', check:s=>s.assessment.completed},
+  {id:'a_first_mission', title:'Mission Starter', desc:'Completed your first mission', icon:'🎯', check:s=>s.missions.completed.length>=1},
+  {id:'a_five_missions', title:'Momentum Builder', desc:'Completed 5 missions', icon:'🔥', check:s=>s.missions.completed.length>=5},
+  {id:'a_ten_missions', title:'Habit Former', desc:'Completed 10 missions', icon:'🏆', check:s=>s.missions.completed.length>=10},
+  {id:'a_streak_3', title:'On a Roll', desc:'3-day check-in streak', icon:'⚡', check:s=>s.streak.longest>=3},
+  {id:'a_streak_7', title:'Week Warrior', desc:'7-day check-in streak', icon:'🗓️', check:s=>s.streak.longest>=7},
+  {id:'a_points_500', title:'Eco Earner', desc:'Earned 500 points', icon:'💎', check:s=>s.points>=500},
+  {id:'a_points_1500', title:'Eco Elite', desc:'Earned 1500 points', icon:'👑', check:s=>s.points>=1500},
+  {id:'a_below_avg', title:'Below Average (in a good way)', desc:'Your footprint beats the global average', icon:'🌍', check:s=>s.assessment.completed && s.scores.annualCO2 < GLOBAL_AVG_CO2},
+  {id:'a_chat', title:'Curious Mind', desc:'Asked the AI coach a question', icon:'💬', check:s=>s.chat.some(c=>c.role==='user')},
+  {id:'a_report', title:'Reflective', desc:'Generated your first weekly report', icon:'📊', check:s=>s.reports.length>=1},
+];
+
+function checkAchievements(){
+  const newly = [];
+  ACHIEVEMENTS.forEach(a=>{
+    if(!STATE.achievements.includes(a.id) && a.check(STATE)){
+      STATE.achievements.push(a.id);
+      newly.push(a);
+    }
+  });
+  if(newly.length){
+    saveState();
+    newly.forEach((a,i)=>{
+      setTimeout(()=>toast(`Achievement unlocked: ${a.title}`, {icon:a.icon, duration:4200}), i*450);
+    });
+  }
+  return newly;
+}
+
+function generateMissions(count=6){
+  if(!STATE.assessment.completed) return MISSION_POOL.slice(0,count);
+  const cats = STATE.scores.categories;
+  // Rank categories by share of footprint, descending — biggest opportunity first
+  const ranked = Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+  const activeIds = new Set([...STATE.missions.active.map(m=>m.id), ...STATE.missions.completed.map(m=>m.id), ...STATE.missions.skipped]);
+
+  let pool = [];
+  ranked.forEach(cat=>{
+    pool.push(...MISSION_POOL.filter(m=>m.category===cat && !activeIds.has(m.id)));
+  });
+  // de-dup while preserving priority order
+  const seen = new Set();
+  pool = pool.filter(m=>!seen.has(m.id) && seen.add(m.id));
+
+  return pool.slice(0, count);
+}
+
+function refreshActiveMissionsIfNeeded(){
+  if(STATE.missions.active.length===0 && STATE.assessment.completed){
+    STATE.missions.active = generateMissions(6);
+    saveState();
+  }
+}
+
+function completeMission(missionId){
+  const idx = STATE.missions.active.findIndex(m=>m.id===missionId);
+  if(idx===-1) return;
+  const mission = STATE.missions.active[idx];
+  STATE.missions.active.splice(idx,1);
+  STATE.missions.completed.push({...mission, completedAt:new Date().toISOString()});
+  STATE.points += mission.points;
+  recordCheckIn();
+  // backfill one new mission
+  const fresh = generateMissions(1);
+  if(fresh.length) STATE.missions.active.push(fresh[0]);
+  saveState();
+  toast(`Mission complete! +${mission.points} pts`, {icon:'🎉'});
+  checkAchievements();
+}
+
+function skipMission(missionId){
+  const idx = STATE.missions.active.findIndex(m=>m.id===missionId);
+  if(idx===-1) return;
+  STATE.missions.skipped.push(missionId);
+  STATE.missions.active.splice(idx,1);
+  const fresh = generateMissions(1);
+  if(fresh.length) STATE.missions.active.push(fresh[0]);
+  saveState();
+}
+
+function recordCheckIn(){
+  const today = new Date().toDateString();
+  if(STATE.streak.lastCheckIn === today) return; // already checked in today
+  const yesterday = new Date(Date.now()-86400000).toDateString();
+  if(STATE.streak.lastCheckIn === yesterday){
+    STATE.streak.current += 1;
+  } else {
+    STATE.streak.current = 1;
+  }
+  STATE.streak.lastCheckIn = today;
+  STATE.streak.longest = Math.max(STATE.streak.longest, STATE.streak.current);
+  saveState();
+}
+
+/* ============================================================
+   AI CARBON COACH — rule-based response engine
+   Grounded in the user's actual stored data: scores, categories,
+   missions, streaks. No network calls; fully deterministic and
+   functional offline, but genuinely reflects user-specific state.
+   ============================================================ */
+
+function coachSystemFacts(){
+  const s = STATE;
+  if(!s.assessment.completed){
+    return null;
+  }
+  const cats = s.scores.categories;
+  const ranked = Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  const topCat = ranked[0];
+  const lowCat = ranked[ranked.length-1];
+  return {
+    score:s.scores.total,
+    annualCO2:s.scores.annualCO2,
+    cats, topCat, lowCat,
+    vsGlobal:percentVsAverage(s.scores.annualCO2),
+    trees:co2ToTrees(s.scores.annualCO2),
+    missionsActive:s.missions.active.length,
+    missionsDone:s.missions.completed.length,
+    points:s.points,
+    streak:s.streak.current,
+  };
+}
+
+const CATEGORY_LABEL = {transport:'transportation', home:'home energy', food:'food & diet', consumption:'shopping & consumption'};
+
+function coachReply(userText){
+  const facts = coachSystemFacts();
+  const t = userText.toLowerCase().trim();
+
+  if(!facts){
+    return "I don't have your carbon profile yet — head to the Assessment first and I'll be able to give you specific, personalized guidance instead of general tips.";
+  }
+
+  // Intent matching — ordered by specificity
+  if(/\b(score|how am i doing|how'?m i doing)\b/.test(t)){
+    return `Your EcoScore is ${facts.score}/100, based on an estimated ${facts.annualCO2.toLocaleString()} kg CO₂e per year. That's ${facts.vsGlobal>=0?`${facts.vsGlobal}% below`:`${Math.abs(facts.vsGlobal)}% above`} the global average. Your biggest opportunity right now is ${CATEGORY_LABEL[facts.topCat[0]]}, at roughly ${Math.round(facts.topCat[1]).toLocaleString()} kg/year.`;
+  }
+  if(/\b(transport|driv|car|commute|flight|fly)\b/.test(t)){
+    const v = Math.round(facts.cats.transport);
+    return `Transportation is responsible for about ${v.toLocaleString()} kg CO₂e/year in your profile. The highest-leverage changes are usually: cutting one car commute a week for transit or biking, combining errands into fewer trips, and being selective about flights — each long-haul round trip can add 1,000+ kg on its own. Want me to add a transport mission to your list?`;
+  }
+  if(/\b(home|energy|electric|heat|thermostat|power)\b/.test(t)){
+    const v = Math.round(facts.cats.home);
+    return `Home energy comes to about ${v.toLocaleString()} kg CO₂e/year for you. Quick wins: lowering your thermostat 1-2 degrees, switching to LED bulbs, and unplugging standby electronics. If you're on standard grid power, looking into a renewable energy plan or community solar can meaningfully shift this number.`;
+  }
+  if(/\b(food|diet|eat|meat|vegan|vegetarian)\b/.test(t)){
+    const v = Math.round(facts.cats.food);
+    return `Food is roughly ${v.toLocaleString()} kg CO₂e/year in your profile. Red meat and dairy are the heaviest contributors per calorie — swapping a few dinners a week for plant-based meals tends to be the single highest-impact, lowest-effort change most people can make.`;
+  }
+  if(/\b(shop|consum|buy|stuff|clothes|fashion)\b/.test(t)){
+    const v = Math.round(facts.cats.consumption);
+    return `Shopping and consumption add up to about ${v.toLocaleString()} kg CO₂e/year for you. Buying secondhand, repairing instead of replacing, and slowing down on fast fashion or gadget upgrades are the biggest levers here.`;
+  }
+  if(/\b(mission|task|what should i do|recommend|suggest)\b/.test(t)){
+    if(facts.missionsActive===0) return "You don't have any active missions right now — head to the Missions tab and I'll generate a fresh set based on your highest-impact categories.";
+    return `You have ${facts.missionsActive} active mission${facts.missionsActive===1?'':'s'} right now, and you've completed ${facts.missionsDone} so far. I prioritize missions in ${CATEGORY_LABEL[facts.topCat[0]]} first since that's your biggest category — check the Missions tab to see them.`;
+  }
+  if(/\b(tree|equivalent|compare|how much is)\b/.test(t)){
+    return `${facts.annualCO2.toLocaleString()} kg CO₂e/year is roughly what ${facts.trees} mature trees would absorb in a year, or about ${co2ToCarMiles(facts.annualCO2).toLocaleString()} miles of average gas-car driving. Putting a number in physical terms like that tends to make it easier to act on.`;
+  }
+  if(/\b(streak|points|level|rank)\b/.test(t)){
+    return `You're on a ${facts.streak}-day streak with ${facts.points.toLocaleString()} points earned from ${facts.missionsDone} completed mission${facts.missionsDone===1?'':'s'}. Consistency matters more than intensity here — small weekly actions compound.`;
+  }
+  if(/\b(offset|carbon offset)\b/.test(t)){
+    return "Offsets are best treated as a last resort after you've reduced what you can directly — they fund projects like reforestation or renewable energy elsewhere to balance out emissions you can't eliminate yet, like flights. Look for offset providers verified by Gold Standard or Verra if you go this route.";
+  }
+  if(/\b(target|goal|2030|paris)\b/.test(t)){
+    return `A Paris-aligned individual target is roughly ${TARGET_2030.toLocaleString()} kg CO₂e/year by 2030. You're currently at ${facts.annualCO2.toLocaleString()} kg/year, so closing that gap is about ${Math.max(0,Math.round(facts.annualCO2-TARGET_2030)).toLocaleString()} kg — completing missions steadily in ${CATEGORY_LABEL[facts.topCat[0]]} is the fastest path there.`;
+  }
+  if(/\b(hi|hello|hey)\b/.test(t)){
+    return `Hey! Your EcoScore is currently ${facts.score}/100. Ask me about your transportation, home energy, food, or shopping footprint, or ask what mission to tackle next.`;
+  }
+  if(/\b(thank|thanks)\b/.test(t)){
+    return "Anytime. Keep at it — small consistent changes beat big one-off gestures.";
+  }
+
+  // Fallback: contextual general guidance
+  return `Based on your profile, your biggest opportunity is ${CATEGORY_LABEL[facts.topCat[0]]} (~${Math.round(facts.topCat[1]).toLocaleString()} kg CO₂e/year), while ${CATEGORY_LABEL[facts.lowCat[0]]} is already your strongest area. Ask me about any specific category, your score, or what mission to try next — I tailor answers to your actual data.`;
+}
+
+function sendChatMessage(text){
+  if(!text.trim()) return;
+  STATE.chat.push({role:'user', text, time:new Date().toISOString()});
+  saveState();
+  renderChatMessages();
+  checkAchievements();
+
+  // simulate thinking delay for natural feel
+  const typingId = showTypingIndicator();
+  setTimeout(()=>{
+    removeTypingIndicator(typingId);
+    const reply = coachReply(text);
+    STATE.chat.push({role:'coach', text:reply, time:new Date().toISOString()});
+    saveState();
+    renderChatMessages();
+  }, 550 + Math.random()*500);
+}
+
+/* ============================================================
+   WEEKLY REPORTS
+   Builds a report object from current state + simple trend math.
+   ============================================================ */
+function generateReport(){
+  const s = STATE;
+  const prevSnapshot = s.history[s.history.length-1];
+  const co2Now = s.scores.annualCO2;
+  const delta = prevSnapshot ? co2Now - prevSnapshot.totalCO2 : 0;
+  const completedThisWeek = s.missions.completed.filter(m=>{
+    const d = new Date(m.completedAt);
+    return (Date.now() - d.getTime()) < 7*86400000;
+  });
+  const co2SavedThisWeek = completedThisWeek.reduce((a,m)=>a+(m.co2Saved||0),0);
+
+  const report = {
+    id:'r_'+Date.now(),
+    date:new Date().toISOString(),
+    score:s.scores.total,
+    annualCO2:co2Now,
+    delta,
+    missionsCompleted:completedThisWeek.length,
+    co2Saved:co2SavedThisWeek,
+    pointsEarned:completedThisWeek.reduce((a,m)=>a+m.points,0),
+    topCategory:Object.entries(s.scores.categories).sort((a,b)=>b[1]-a[1])[0][0],
+    streak:s.streak.current,
+  };
+  s.reports.unshift(report);
+  s.history.push({date:new Date().toISOString(), totalCO2:co2Now, score:s.scores.total});
+  saveState();
+  checkAchievements();
+  return report;
+}
+
+/* ============================================================
+   ROUTER
+   ============================================================ */
+const FLOW = ['landing','auth','assessment','analysis','missions','dashboard','reports','chat'];
+const NAV_FLOW = ['assessment','analysis','missions','dashboard','reports','chat']; // shown in top nav steps
+const FLOW_LABELS = {landing:'Start', auth:'Sign in', assessment:'Assess', analysis:'Analysis', missions:'Missions', dashboard:'Dashboard', reports:'Reports', chat:'AI Coach'};
+const AUTH_REQUIRED = new Set(['assessment','analysis','missions','dashboard','reports','chat']);
+
+const RENDERERS = {}; // populated by screen modules
+
+function navigate(screenId, opts={}){
+  if(!RENDERERS[screenId]) return;
+  if(AUTH_REQUIRED.has(screenId) && !getSession()){
+    screenId = 'auth';
+  }
+  STATE.currentScreen = screenId;
+  saveState();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  let el = document.getElementById('screen-'+screenId);
+  RENDERERS[screenId](el);
+  el.classList.add('active');
+  renderNav();
+  if(!opts.preserveScroll) window.scrollTo({top:0, behavior:'instant' in window ? 'instant':'auto'});
+}
+
+function isScreenUnlocked(screenId){
+  if(!getSession()) return false;
+  if(screenId==='assessment') return true;
+  return STATE.assessment.completed;
+}
+
+function renderNav(){
+  const stepsEl = document.getElementById('nav-steps');
+  const loggedIn = !!getSession();
+  stepsEl.innerHTML = NAV_FLOW.map(id=>{
+    const unlocked = isScreenUnlocked(id);
+    const isCurrent = STATE.currentScreen===id;
+    const isDone = NAV_FLOW.indexOf(id) < NAV_FLOW.indexOf(STATE.currentScreen) && unlocked;
+    const cls = ['nav-step'];
+    if(isCurrent) cls.push('current'); else if(isDone) cls.push('done');
+    if(!unlocked) cls.push('locked');
+    return `<button class="${cls.join(' ')}" data-nav="${id}" ${unlocked?'':'disabled'} aria-current="${isCurrent?'true':'false'}">
+      <span class="dot"></span>${FLOW_LABELS[id]}
+    </button>`;
+  }).join('');
+  stepsEl.querySelectorAll('[data-nav]').forEach(btn=>{
+    btn.addEventListener('click', ()=>navigate(btn.dataset.nav));
+  });
+
+  const rightEl = document.getElementById('nav-right');
+  if(!loggedIn){
+    rightEl.innerHTML = `<button class="btn btn-ghost btn-sm" id="nav-signin-btn">Sign in</button>`;
+    const b = document.getElementById('nav-signin-btn');
+    if(b) b.addEventListener('click', ()=>navigate('auth'));
+    return;
+  }
+  const account = currentAccount();
+  const pills = STATE.assessment.completed ? `
+      <div class="streak-pill" title="Daily check-in streak">🔥 <span class="num">${STATE.streak.current}</span></div>
+      <div class="points-pill" title="Total points earned">⬡ <span class="num">${STATE.points.toLocaleString()}</span></div>
+  ` : '';
+  rightEl.innerHTML = `
+    ${pills}
+    <div class="account-menu" id="account-menu">
+      <button class="account-pill" id="account-pill-btn" title="${account?account.email:''}">
+        <span class="account-avatar">${account ? account.name.trim().charAt(0).toUpperCase() : '?'}</span>
+        <span class="account-name">${account ? account.name.split(' ')[0] : 'Account'}</span>
+      </button>
+      <div class="account-dropdown" id="account-dropdown">
+        <div class="account-dropdown-email">${account ? account.email : ''}</div>
+        <button class="account-dropdown-item" id="logout-btn">Log out</button>
+      </div>
+    </div>
+  `;
+  const pillBtn = document.getElementById('account-pill-btn');
+  const dropdown = document.getElementById('account-dropdown');
+  if(pillBtn && dropdown){
+    pillBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', ()=>dropdown.classList.remove('open'), {once:true});
+  }
+  const logoutBtn = document.getElementById('logout-btn');
+  if(logoutBtn) logoutBtn.addEventListener('click', ()=>{
+    logout();
+    toast('Logged out', {icon:'👋'});
+  });
+}
+
+document.getElementById('brand-home-link').addEventListener('click', ()=>navigate('landing'));
+
+/* ============================================================
+   UTIL HELPERS shared across screens
+   ============================================================ */
+function el(html){
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+function fmtCO2(kg){ return kg.toLocaleString(undefined,{maximumFractionDigits:0}); }
+function fmtDate(iso){ return new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
+function difficultyColor(d){ return d==='easy' ? 'var(--emerald-bright)' : d==='medium' ? 'var(--teal-bright)' : 'var(--amber-bright)'; }
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+window.addEventListener('DOMContentLoaded', ()=>{
+  // Build screen containers
+  const screensRoot = document.getElementById('screens');
+  FLOW.forEach(id=>{
+    const section = document.createElement('section');
+    section.className = 'screen';
+    section.id = 'screen-'+id;
+    screensRoot.appendChild(section);
+  });
+
+  refreshActiveMissionsIfNeeded();
+
+  let start = STATE.currentScreen;
+  if(AUTH_REQUIRED.has(start) && !getSession()) start = 'landing';
+  if(!RENDERERS[start]) start = 'landing';
+  navigate(start);
+});
+/* ============================================================
+   SCREEN: LANDING
+   ============================================================ */
+RENDERERS.landing = function(root){
+  root.innerHTML = `
+  <section class="hero-section">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <div class="eyebrow">AI SUSTAINABILITY COACH</div>
+        <h1 class="hero-title">Know your carbon<br>number. <span class="grad-text">Actually change it.</span></h1>
+        <p class="hero-sub">EcoPilot turns vague eco-guilt into a real number, a clear plan, and small weekly missions that move it. Five-minute assessment, lifetime of better defaults.</p>
+        <div class="hero-actions">
+          <button class="btn btn-primary" id="btn-start">Calculate my footprint →</button>
+          <button class="btn btn-ghost" id="btn-learn">See how it works</button>
+        </div>
+        <p class="hero-signin-row">Already tracking your footprint? <button class="auth-link" id="hero-signin">Log in</button></p>
+        <div class="hero-stats">
+          <div class="hstat"><span class="num">4,800</span><span>kg CO₂e global avg / year</span></div>
+          <div class="hstat"><span class="num">2,300</span><span>kg CO₂e 2030 target / year</span></div>
+          <div class="hstat"><span class="num">5 min</span><span>to get your score</span></div>
+        </div>
+      </div>
+      <div class="hero-visual" id="hero-orbit"></div>
+    </div>
+  </section>
+
+  <section class="wrap how-section" id="how-it-works">
+    <div class="eyebrow">THE FLOW</div>
+    <h2 class="section-title">Seven steps, one habit loop</h2>
+    <div class="flow-rail">
+      ${[
+        ['Assess','Answer questions about transport, home, food and shopping.','📝'],
+        ['Analyze','Get a transparent EcoScore broken down by category.','📊'],
+        ['Mission','Take on small, personalized weekly actions.','🎯'],
+        ['Track','Watch your dashboard and streak grow over time.','📈'],
+        ['Report','Get a weekly summary of impact and progress.','🗞️'],
+        ['Ask','Chat with your AI coach about anything carbon-related.','💬'],
+      ].map(([t,d,i],idx)=>`
+        <div class="flow-step">
+          <div class="flow-num">${String(idx+1).padStart(2,'0')}</div>
+          <div class="flow-icon">${i}</div>
+          <h4>${t}</h4>
+          <p>${d}</p>
+        </div>
+      `).join('')}
+    </div>
+  </section>
+
+  <section class="wrap features-section">
+    <div class="eyebrow">WHAT'S INSIDE</div>
+    <h2 class="section-title">Built for follow-through, not guilt</h2>
+    <div class="feature-grid">
+      <div class="card card-hover feature-card">
+        <div class="feature-icon" style="background:rgba(16,185,129,0.12);color:var(--emerald-bright);">⚡</div>
+        <h4>Category-level scoring</h4>
+        <p>Transport, home, food and consumption — see exactly where your impact comes from, not just one vague number.</p>
+      </div>
+      <div class="card card-hover feature-card">
+        <div class="feature-icon" style="background:rgba(20,184,166,0.12);color:var(--teal-bright);">🎯</div>
+        <h4>Personalized missions</h4>
+        <p>Weekly actions ranked by your actual highest-impact category, not a generic checklist everyone gets.</p>
+      </div>
+      <div class="card card-hover feature-card">
+        <div class="feature-icon" style="background:rgba(245,166,35,0.12);color:var(--amber-bright);">🔥</div>
+        <h4>Streaks & points</h4>
+        <p>Light gamification that rewards consistency — the thing that actually bends the curve over months.</p>
+      </div>
+      <div class="card card-hover feature-card">
+        <div class="feature-icon" style="background:rgba(16,185,129,0.12);color:var(--emerald-bright);">💬</div>
+        <h4>AI coach that knows your data</h4>
+        <p>Ask questions and get answers grounded in your real footprint, not generic sustainability trivia.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap cta-section">
+    <div class="card cta-card">
+      <h2>Your number is five minutes away.</h2>
+      <p>No account, no email — your data stays on this device.</p>
+      <button class="btn btn-primary" id="btn-start-2">Start the assessment →</button>
+    </div>
+  </section>
+  `;
+
+  injectLandingStyles();
+  renderHeroOrbit(document.getElementById('hero-orbit'));
+
+  root.querySelector('#btn-start').addEventListener('click', ()=>navigate('assessment'));
+  root.querySelector('#btn-start-2').addEventListener('click', ()=>navigate('assessment'));
+  root.querySelector('#hero-signin').addEventListener('click', ()=>navigate('auth'));
+  root.querySelector('#btn-learn').addEventListener('click', ()=>{
+    document.getElementById('how-it-works').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+};
+
+function renderHeroOrbit(container){
+  container.innerHTML = `
+  <svg viewBox="0 0 420 420" class="orbit-svg" aria-hidden="true">
+    <defs>
+      <radialGradient id="orbitGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#34D399" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#34D399" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#34D399"/>
+        <stop offset="100%" stop-color="#14B8A6"/>
+      </linearGradient>
+    </defs>
+    <circle cx="210" cy="210" r="190" fill="url(#orbitGlow)"/>
+    <circle cx="210" cy="210" r="150" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <circle cx="210" cy="210" r="110" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    <circle cx="210" cy="210" r="150" fill="none" stroke="url(#ringGrad)" stroke-width="3" stroke-linecap="round"
+      stroke-dasharray="700" stroke-dashoffset="180" transform="rotate(-90 210 210)" class="orbit-ring"/>
+    <g class="orbit-sat orbit-sat-1"><circle cx="210" cy="60" r="7" fill="#34D399"/></g>
+    <g class="orbit-sat orbit-sat-2"><circle cx="360" cy="210" r="5" fill="#2DD4BF"/></g>
+    <g class="orbit-sat orbit-sat-3"><circle cx="210" cy="320" r="4" fill="#F5A623"/></g>
+    <text x="210" y="200" text-anchor="middle" class="orbit-num" font-family="JetBrains Mono" font-size="52" font-weight="700" fill="#FAFCF9">74</text>
+    <text x="210" y="232" text-anchor="middle" class="orbit-label" font-family="Inter" font-size="13" fill="#82998C" letter-spacing="2">SAMPLE ECOSCORE</text>
+  </svg>
+  `;
+}
+
+function injectLandingStyles(){
+  if(document.getElementById('landing-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'landing-styles';
+  style.textContent = `
+  .hero-section{padding:64px 0 40px;}
+  .hero-grid{display:grid;grid-template-columns:1.05fr 0.95fr;gap:48px;align-items:center;}
+  @media (max-width:980px){.hero-grid{grid-template-columns:1fr;}}
+  .hero-title{font-size:clamp(2.4rem,5vw,3.6rem);margin-bottom:20px;}
+  .grad-text{background:linear-gradient(135deg,var(--emerald-bright),var(--teal-bright));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .hero-sub{font-size:1.08rem;color:var(--slate-300);max-width:520px;line-height:1.65;margin-bottom:32px;}
+  .hero-actions{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:48px;}
+  .hero-signin-row{font-size:0.85rem;color:var(--slate-400);margin-bottom:32px;}
+  .hero-stats{display:flex;gap:36px;flex-wrap:wrap;}
+  .hstat{display:flex;flex-direction:column;gap:4px;}
+  .hstat .num{font-family:var(--font-mono);font-size:1.3rem;font-weight:700;color:var(--emerald-bright);}
+  .hstat span:last-child{font-size:0.76rem;color:var(--slate-400);}
+
+  .orbit-svg{width:100%;max-width:440px;margin:0 auto;}
+  .orbit-ring{animation:ringPulse 4s var(--ease) infinite;}
+  @keyframes ringPulse{0%,100%{stroke-dashoffset:180;}50%{stroke-dashoffset:140;}}
+  .orbit-sat{transform-origin:210px 210px;}
+  .orbit-sat-1{animation:orbitSpin 14s linear infinite;}
+  .orbit-sat-2{animation:orbitSpin 9s linear infinite reverse;}
+  .orbit-sat-3{animation:orbitSpin 20s linear infinite;}
+  @keyframes orbitSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+
+  .how-section{padding:80px 0;}
+  .section-title{font-size:clamp(1.8rem,3.4vw,2.5rem);margin-bottom:44px;max-width:640px;}
+  .flow-rail{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;}
+  @media (max-width:980px){.flow-rail{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:600px){.flow-rail{grid-template-columns:repeat(2,1fr);}}
+  .flow-step{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:var(--radius-md);padding:20px 16px;position:relative;transition:border-color .25s var(--ease),transform .25s var(--ease);}
+  .flow-step:hover{border-color:rgba(16,185,129,0.35);transform:translateY(-3px);}
+  .flow-num{font-family:var(--font-mono);font-size:0.7rem;color:var(--slate-500);margin-bottom:10px;}
+  .flow-icon{font-size:1.5rem;margin-bottom:10px;}
+  .flow-step h4{font-size:0.95rem;margin-bottom:6px;}
+  .flow-step p{font-size:0.78rem;color:var(--slate-400);line-height:1.5;}
+
+  .features-section{padding:40px 0 80px;}
+  .feature-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
+  @media (max-width:980px){.feature-grid{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:600px){.feature-grid{grid-template-columns:1fr;}}
+  .feature-card h4{font-size:1.02rem;margin:16px 0 8px;}
+  .feature-card p{font-size:0.85rem;color:var(--slate-400);line-height:1.55;}
+  .feature-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;}
+
+  .cta-section{padding:20px 0 80px;}
+  .cta-card{text-align:center;padding:56px 32px;background:linear-gradient(135deg, rgba(16,185,129,0.1), rgba(20,184,166,0.06));border-color:rgba(16,185,129,0.25);}
+  .cta-card h2{font-size:clamp(1.6rem,3vw,2.1rem);margin-bottom:10px;}
+  .cta-card p{color:var(--slate-400);margin-bottom:28px;}
+  `;
+  document.head.appendChild(style);
+}
+/* ============================================================
+   SCREEN: AUTH (login / signup)
+   ============================================================ */
+let authMode = 'login'; // 'login' | 'signup'
+
+RENDERERS.auth = function(root){
+  injectAuthStyles();
+  authMode = 'login';
+  renderAuthScreen(root);
+};
+
+function renderAuthScreen(root){
+  const isLogin = authMode === 'login';
+  root.innerHTML = `
+  <section class="wrap auth-wrap">
+    <div class="auth-card card">
+      <div class="auth-logo">
+        <svg width="44" height="44" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs><linearGradient id="authlg" x1="0" y1="0" x2="34" y2="34"><stop stop-color="#34D399"/><stop offset="1" stop-color="#14B8A6"/></linearGradient></defs>
+          <circle cx="17" cy="17" r="16" fill="url(#authlg)" fill-opacity="0.14"/>
+          <path d="M17 4C17 4 27 9 27 18.5C27 24.3 22.5 29 17 29C11.5 29 7 24.3 7 18.5C7 9 17 4 17 4Z" fill="url(#authlg)"/>
+          <path d="M9 19L13.5 19L15.5 14L18 23L20 17L22 19L25 19" stroke="#0A0F0D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab ${isLogin?'active':''}" data-mode="login">Log in</button>
+        <button class="auth-tab ${!isLogin?'active':''}" data-mode="signup">Sign up</button>
+      </div>
+
+      <h2 class="auth-title">${isLogin ? 'Welcome back' : 'Create your account'}</h2>
+      <p class="auth-sub">${isLogin ? 'Log in to continue tracking your footprint.' : 'Your data stays on this device, tied to your account.'}</p>
+
+      <form id="auth-form" class="auth-form" novalidate>
+        ${!isLogin ? `
+        <label class="auth-field">
+          <span>Name</span>
+          <input type="text" id="auth-name" placeholder="Your name" autocomplete="name" />
+        </label>` : ''}
+        <label class="auth-field">
+          <span>Email</span>
+          <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
+        </label>
+        <label class="auth-field">
+          <span>Password</span>
+          <div class="auth-pw-row">
+            <input type="password" id="auth-password" placeholder="${isLogin ? 'Your password' : 'At least 6 characters'}" autocomplete="${isLogin?'current-password':'new-password'}" />
+            <button type="button" class="auth-pw-toggle" id="auth-pw-toggle" tabindex="-1">Show</button>
+          </div>
+        </label>
+
+        <div class="auth-error" id="auth-error" style="display:none;"></div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="auth-submit">
+          <span id="auth-submit-label">${isLogin ? 'Log in' : 'Create account'}</span>
+        </button>
+      </form>
+
+      <p class="auth-switch">
+        ${isLogin ? `Don't have an account? <button class="auth-link" id="auth-switch-btn">Sign up</button>`
+                  : `Already have an account? <button class="auth-link" id="auth-switch-btn">Log in</button>`}
+      </p>
+
+      <p class="auth-disclaimer">Demo auth — accounts and passwords are stored only in this browser's local storage, not on a server.</p>
+    </div>
+  </section>
+  `;
+
+  root.querySelectorAll('.auth-tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      authMode = tab.dataset.mode;
+      renderAuthScreen(root);
+    });
+  });
+  const switchBtn = root.querySelector('#auth-switch-btn');
+  if(switchBtn) switchBtn.addEventListener('click', ()=>{
+    authMode = isLogin ? 'signup' : 'login';
+    renderAuthScreen(root);
+  });
+
+  const pwInput = root.querySelector('#auth-password');
+  const pwToggle = root.querySelector('#auth-pw-toggle');
+  if(pwToggle){
+    pwToggle.addEventListener('click', ()=>{
+      const showing = pwInput.type === 'text';
+      pwInput.type = showing ? 'password' : 'text';
+      pwToggle.textContent = showing ? 'Show' : 'Hide';
+    });
+  }
+
+  const form = root.querySelector('#auth-form');
+  form.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    handleAuthSubmit(root);
+  });
+}
+
+function showAuthError(root, msg){
+  const errEl = root.querySelector('#auth-error');
+  errEl.textContent = msg;
+  errEl.style.display = 'block';
+}
+
+function handleAuthSubmit(root){
+  const errEl = root.querySelector('#auth-error');
+  errEl.style.display = 'none';
+
+  const email = root.querySelector('#auth-email').value;
+  const password = root.querySelector('#auth-password').value;
+  const submitBtn = root.querySelector('#auth-submit');
+  const submitLabel = root.querySelector('#auth-submit-label');
+
+  if(!email.trim() || !password){
+    showAuthError(root, 'Please fill in all fields.');
+    return;
+  }
+
+  submitBtn.disabled = true;
+  const originalLabel = submitLabel.textContent;
+  submitLabel.innerHTML = `<span class="spinner" style="display:inline-block;vertical-align:middle;"></span>`;
+
+  // tiny artificial delay so the loading state is perceptible — mirrors a real network round trip
+  setTimeout(()=>{
+    let result;
+    if(authMode === 'login'){
+      result = login(email, password);
+    } else {
+      const name = root.querySelector('#auth-name').value;
+      result = signup(name, email, password);
+    }
+
+    if(!result.ok){
+      submitBtn.disabled = false;
+      submitLabel.textContent = originalLabel;
+      showAuthError(root, result.error);
+      return;
+    }
+
+    refreshActiveMissionsIfNeeded();
+    const account = currentAccount();
+    toast(`Welcome${account ? ', '+account.name.split(' ')[0] : ''}!`, {icon:'🌱'});
+    navigate(STATE.assessment.completed ? 'dashboard' : 'assessment');
+  }, 450);
+}
+
+function injectAuthStyles(){
+  if(document.getElementById('auth-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'auth-styles';
+  style.textContent = `
+  .auth-wrap{padding:72px 0 100px;display:flex;justify-content:center;}
+  .auth-card{width:100%;max-width:420px;padding:40px 36px;text-align:center;}
+  .auth-logo{display:flex;justify-content:center;margin-bottom:18px;}
+
+  .auth-tabs{display:flex;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:99px;padding:4px;margin-bottom:28px;}
+  .auth-tab{flex:1;padding:9px 0;border-radius:99px;font-family:var(--font-display);font-weight:600;font-size:0.85rem;color:var(--slate-400);background:none;border:none;transition:all .2s var(--ease);}
+  .auth-tab.active{background:linear-gradient(135deg,var(--emerald-bright),var(--teal));color:var(--slate-950);}
+
+  .auth-title{font-size:1.5rem;margin-bottom:8px;}
+  .auth-sub{color:var(--slate-400);font-size:0.88rem;margin-bottom:28px;line-height:1.5;}
+
+  .auth-form{display:flex;flex-direction:column;gap:16px;text-align:left;}
+  .auth-field{display:flex;flex-direction:column;gap:6px;}
+  .auth-field span{font-size:0.78rem;color:var(--slate-300);font-weight:500;}
+  .auth-field input{
+    background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:12px;
+    padding:13px 15px;color:var(--white);font-family:var(--font-body);font-size:0.92rem;width:100%;
+    transition:border-color .2s var(--ease);
+  }
+  .auth-field input:focus{border-color:var(--emerald);outline:none;}
+  .auth-field input::placeholder{color:var(--slate-500);}
+
+  .auth-pw-row{position:relative;display:flex;align-items:center;}
+  .auth-pw-row input{padding-right:58px;}
+  .auth-pw-toggle{
+    position:absolute;right:6px;font-size:0.72rem;color:var(--emerald-bright);background:none;border:none;
+    padding:6px 10px;font-family:var(--font-mono);
+  }
+
+  .auth-error{
+    background:rgba(255,107,94,0.1);border:1px solid rgba(255,107,94,0.3);color:#FF8C82;
+    font-size:0.82rem;padding:10px 14px;border-radius:10px;line-height:1.4;
+  }
+
+  .auth-switch{margin-top:22px;font-size:0.85rem;color:var(--slate-400);}
+  .auth-link{color:var(--emerald-bright);background:none;border:none;font-weight:600;font-size:0.85rem;padding:0;}
+  .auth-link:hover{text-decoration:underline;}
+
+  .auth-disclaimer{margin-top:24px;font-size:0.68rem;color:var(--slate-600);line-height:1.5;}
+
+  /* Account menu in nav */
+  .account-menu{position:relative;}
+  .account-pill{
+    display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+    padding:6px 12px 6px 6px;border-radius:99px;color:var(--white);font-size:0.82rem;font-family:var(--font-body);
+  }
+  .account-pill:hover{border-color:rgba(16,185,129,0.35);}
+  .account-avatar{
+    width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--emerald-bright),var(--teal));
+    color:var(--slate-950);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;flex-shrink:0;
+  }
+  .account-dropdown{
+    position:absolute;top:calc(100% + 8px);right:0;background:var(--slate-900);border:1px solid rgba(255,255,255,0.1);
+    border-radius:14px;padding:10px;min-width:200px;box-shadow:0 16px 40px -12px rgba(0,0,0,0.6);
+    opacity:0;visibility:hidden;transform:translateY(-6px);transition:all .2s var(--ease);z-index:60;
+  }
+  .account-dropdown.open{opacity:1;visibility:visible;transform:translateY(0);}
+  .account-dropdown-email{font-size:0.75rem;color:var(--slate-400);padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:6px;word-break:break-all;}
+  .account-dropdown-item{
+    width:100%;text-align:left;padding:9px 10px;border-radius:8px;background:none;border:none;color:var(--slate-100);font-size:0.85rem;
+  }
+  .account-dropdown-item:hover{background:rgba(255,255,255,0.06);}
+
+  @media (max-width:480px){.auth-card{padding:32px 22px;}}
+  `;
+  document.head.appendChild(style);
+}
+/* ============================================================
+   SCREEN: ASSESSMENT (wizard)
+   ============================================================ */
+let assessmentStep = 0;
+
+RENDERERS.assessment = function(root){
+  assessmentStep = 0;
+  injectAssessmentStyles();
+  renderAssessmentStep(root);
+};
+
+function renderAssessmentStep(root){
+  const total = ASSESSMENT_QUESTIONS.length;
+  const q = ASSESSMENT_QUESTIONS[assessmentStep];
+  const pct = Math.round((assessmentStep/total)*100);
+  const selected = STATE.assessment.answers[q.id];
+
+  root.innerHTML = `
+  <section class="wrap assess-wrap">
+    <div class="assess-progress-row">
+      <span class="assess-step-label">Question <span class="num">${assessmentStep+1}</span> of <span class="num">${total}</span></span>
+      <span class="assess-step-label">${pct}%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+
+    <div class="assess-card card">
+      <div class="eyebrow">${CATEGORY_LABEL[q.category].toUpperCase()}</div>
+      <h2 class="assess-q">${q.q}</h2>
+      <p class="assess-help">${q.help}</p>
+      <div class="assess-options" id="assess-options">
+        ${q.options.map(o=>`
+          <button class="assess-opt ${selected===o.v?'selected':''}" data-val="${o.v}">
+            <span class="assess-opt-icon">${o.icon}</span>
+            <span class="assess-opt-label">${o.label}</span>
+            <span class="assess-opt-check">✓</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="assess-nav">
+      <button class="btn btn-ghost" id="assess-back" ${assessmentStep===0?'disabled':''}>← Back</button>
+      <button class="btn btn-primary" id="assess-next" ${selected?'':'disabled'}>${assessmentStep===total-1?'See my results →':'Next →'}</button>
+    </div>
+  </section>
+  `;
+
+  root.querySelectorAll('.assess-opt').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      STATE.assessment.answers[q.id] = btn.dataset.val;
+      saveState();
+      root.querySelectorAll('.assess-opt').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      root.querySelector('#assess-next').disabled = false;
+      // auto-advance after a short delay for nice flow, unless last question
+      if(assessmentStep < total-1){
+        setTimeout(()=>goAssessmentStep(root, 1), 280);
+      }
+    });
+  });
+
+  root.querySelector('#assess-back').addEventListener('click', ()=>goAssessmentStep(root, -1));
+  root.querySelector('#assess-next').addEventListener('click', ()=>{
+    if(assessmentStep === total-1){
+      finishAssessment();
+    } else {
+      goAssessmentStep(root, 1);
+    }
+  });
+}
+
+function goAssessmentStep(root, delta){
+  const total = ASSESSMENT_QUESTIONS.length;
+  assessmentStep = Math.max(0, Math.min(total-1, assessmentStep+delta));
+  renderAssessmentStep(root);
+}
+
+function finishAssessment(){
+  const result = computeAssessment(STATE.assessment.answers);
+  STATE.scores = result;
+  STATE.assessment.completed = true;
+  STATE.history.push({date:new Date().toISOString(), totalCO2:result.annualCO2, score:result.total});
+  STATE.missions.active = generateMissions(6);
+  saveState();
+  checkAchievements();
+  toast('Assessment complete — your EcoScore is ready', {icon:'✨'});
+  navigate('analysis');
+}
+
+function injectAssessmentStyles(){
+  if(document.getElementById('assess-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'assess-styles';
+  style.textContent = `
+  .assess-wrap{padding:56px 0 80px;max-width:720px;}
+  .assess-progress-row{display:flex;justify-content:space-between;margin-bottom:10px;}
+  .assess-step-label{font-family:var(--font-mono);font-size:0.78rem;color:var(--slate-400);}
+  .progress-track{height:6px;border-radius:99px;background:rgba(255,255,255,0.07);overflow:hidden;margin-bottom:36px;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--emerald),var(--teal-bright));border-radius:99px;transition:width .4s var(--ease);}
+
+  .assess-card{padding:40px;}
+  .assess-q{font-size:1.6rem;margin-bottom:10px;}
+  .assess-help{color:var(--slate-400);font-size:0.92rem;margin-bottom:28px;}
+  .assess-options{display:flex;flex-direction:column;gap:10px;}
+  .assess-opt{
+    display:flex;align-items:center;gap:14px;text-align:left;
+    background:rgba(255,255,255,0.025);border:1.5px solid rgba(255,255,255,0.09);
+    border-radius:var(--radius-md);padding:16px 18px;width:100%;
+    transition:all .2s var(--ease);color:var(--slate-100);
+  }
+  .assess-opt:hover{border-color:rgba(16,185,129,0.35);background:rgba(16,185,129,0.04);}
+  .assess-opt.selected{border-color:var(--emerald);background:rgba(16,185,129,0.1);}
+  .assess-opt-icon{font-size:1.3rem;flex-shrink:0;}
+  .assess-opt-label{flex:1;font-size:0.95rem;font-weight:500;}
+  .assess-opt-check{opacity:0;color:var(--emerald-bright);font-weight:700;transition:opacity .2s var(--ease);}
+  .assess-opt.selected .assess-opt-check{opacity:1;}
+
+  .assess-nav{display:flex;justify-content:space-between;margin-top:28px;}
+  @media (max-width:600px){.assess-card{padding:26px 22px;}.assess-q{font-size:1.3rem;}}
+  `;
+  document.head.appendChild(style);
+}
+/* ============================================================
+   SCREEN: ANALYSIS (results breakdown)
+   ============================================================ */
+RENDERERS.analysis = function(root){
+  if(!STATE.assessment.completed){
+    root.innerHTML = emptyState('Take the assessment first', 'Your analysis will appear here once you complete the carbon assessment.', 'Start assessment', ()=>navigate('assessment'));
+    return;
+  }
+  injectAnalysisStyles();
+  const s = STATE.scores;
+  const cats = Object.entries(s.categories).sort((a,b)=>b[1]-a[1]);
+  const maxCat = cats[0][1];
+  const vsGlobal = percentVsAverage(s.annualCO2);
+  const scoreColor = s.total>=75?'var(--emerald-bright)':s.total>=50?'var(--teal-bright)':'var(--amber-bright)';
+
+  root.innerHTML = `
+  <section class="wrap analysis-wrap">
+    <div class="eyebrow">YOUR RESULTS</div>
+    <h1 class="analysis-title">Here's your carbon picture</h1>
+    <p class="analysis-sub">Based on your answers, here's where your footprint comes from — and what it means.</p>
+
+    <div class="analysis-top-grid">
+      <div class="card score-card">
+        <svg viewBox="0 0 200 200" class="score-ring">
+          <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="14"/>
+          <circle cx="100" cy="100" r="84" fill="none" stroke="${scoreColor}" stroke-width="14" stroke-linecap="round"
+            stroke-dasharray="${2*Math.PI*84}" stroke-dashoffset="${2*Math.PI*84*(1-s.total/100)}"
+            transform="rotate(-90 100 100)" class="score-ring-fill"/>
+        </svg>
+        <div class="score-ring-text">
+          <span class="num score-num">${s.total}</span>
+          <span class="score-num-label">ECOSCORE</span>
+        </div>
+        <p class="score-blurb">${scoreBlurb(s.total)}</p>
+      </div>
+
+      <div class="card stat-stack">
+        <div class="stat-row">
+          <span class="stat-label">Estimated annual footprint</span>
+          <span class="num stat-value">${fmtCO2(s.annualCO2)} <small>kg CO₂e/yr</small></span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Vs. global average</span>
+          <span class="num stat-value" style="color:${vsGlobal>=0?'var(--emerald-bright)':'var(--coral)'}">${vsGlobal>=0?'−':'+'}${Math.abs(vsGlobal)}%</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Equivalent to</span>
+          <span class="num stat-value">${co2ToTrees(s.annualCO2)} <small>trees/yr to offset</small></span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Or driving</span>
+          <span class="num stat-value">${co2ToCarMiles(s.annualCO2).toLocaleString()} <small>miles/yr</small></span>
+        </div>
+        <div class="stat-row" style="border-bottom:none;">
+          <span class="stat-label">2030 target gap</span>
+          <span class="num stat-value">${Math.max(0,Math.round(s.annualCO2-TARGET_2030)).toLocaleString()} <small>kg to close</small></span>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title-sm">Breakdown by category</h2>
+    <div class="card cat-breakdown">
+      ${cats.map(([cat,val])=>`
+        <div class="cat-row">
+          <div class="cat-row-top">
+            <span class="cat-name">${catIcon(cat)} ${CATEGORY_LABEL[cat]}</span>
+            <span class="num cat-val">${fmtCO2(val)} kg</span>
+          </div>
+          <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${(val/maxCat)*100}%;background:${catColor(cat)}"></div></div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="analysis-insight card">
+      <div class="eyebrow">KEY INSIGHT</div>
+      <p class="insight-text">${generateInsight(cats)}</p>
+    </div>
+
+    <div class="analysis-actions">
+      <button class="btn btn-primary" id="to-missions">See my missions →</button>
+      <button class="btn btn-ghost" id="retake">Retake assessment</button>
+    </div>
+  </section>
+  `;
+
+  root.querySelector('#to-missions').addEventListener('click', ()=>navigate('missions'));
+  root.querySelector('#retake').addEventListener('click', ()=>{
+    if(confirm('Retaking will reset your answers and recalculate your score. Continue?')){
+      STATE.assessment = {completed:false, answers:{}};
+      saveState();
+      navigate('assessment');
+    }
+  });
+
+  // animate ring on mount
+  requestAnimationFrame(()=>{
+    const ring = root.querySelector('.score-ring-fill');
+    if(ring) ring.style.transition = 'stroke-dashoffset 1.1s var(--ease)';
+  });
+};
+
+function scoreBlurb(score){
+  if(score>=85) return 'Outstanding — you\'re tracking near the Paris-aligned target already.';
+  if(score>=70) return 'Strong footprint, well below the global average.';
+  if(score>=50) return 'Around the global average, with clear room to improve.';
+  if(score>=30) return 'Above average impact — a few changes will move this fast.';
+  return 'High footprint, but also high opportunity — small wins add up quickly here.';
+}
+function catIcon(cat){ return {transport:'🚗',home:'🏠',food:'🍽️',consumption:'🛍️'}[cat]; }
+function catColor(cat){ return {transport:'var(--emerald-bright)',home:'var(--teal-bright)',food:'var(--amber-bright)',consumption:'var(--coral)'}[cat]; }
+function generateInsight(catsSorted){
+  const [topCat, topVal] = catsSorted[0];
+  const [lowCat] = catsSorted[catsSorted.length-1];
+  const share = Math.round((topVal/catsSorted.reduce((a,[,v])=>a+v,0))*100);
+  return `${CATEGORY_LABEL[topCat].charAt(0).toUpperCase()+CATEGORY_LABEL[topCat].slice(1)} makes up about ${share}% of your total footprint — it's your single biggest lever. Meanwhile ${CATEGORY_LABEL[lowCat]} is already your strongest category. Your missions are weighted to tackle ${CATEGORY_LABEL[topCat]} first.`;
+}
+
+function emptyState(title, body, cta, onClick){
+  const wrapper = document.createElement('div');
+  wrapper.className = 'wrap empty-state-wrap';
+  wrapper.innerHTML = `
+    <div class="card empty-card">
+      <div class="empty-icon">🌱</div>
+      <h2>${title}</h2>
+      <p>${body}</p>
+      <button class="btn btn-primary" id="empty-cta">${cta}</button>
+    </div>
+  `;
+  setTimeout(()=>{
+    const btn = wrapper.querySelector('#empty-cta');
+    if(btn) btn.addEventListener('click', onClick);
+  });
+  return wrapper.outerHTML;
+}
+
+function injectAnalysisStyles(){
+  if(document.getElementById('analysis-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'analysis-styles';
+  style.textContent = `
+  .analysis-wrap{padding:56px 0 80px;}
+  .analysis-title{font-size:clamp(2rem,4vw,2.8rem);margin-bottom:10px;}
+  .analysis-sub{color:var(--slate-400);max-width:560px;margin-bottom:40px;}
+
+  .analysis-top-grid{display:grid;grid-template-columns:340px 1fr;gap:20px;margin-bottom:48px;}
+  @media (max-width:860px){.analysis-top-grid{grid-template-columns:1fr;}}
+
+  .score-card{display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;padding:36px;}
+  .score-ring{width:200px;height:200px;}
+  .score-ring-text{position:absolute;top:108px;display:flex;flex-direction:column;align-items:center;}
+  .score-num{font-size:3.2rem;font-weight:700;color:var(--white);line-height:1;}
+  .score-num-label{font-family:var(--font-mono);font-size:0.68rem;letter-spacing:0.1em;color:var(--slate-400);margin-top:4px;}
+  .score-blurb{margin-top:20px;color:var(--slate-300);font-size:0.9rem;line-height:1.5;}
+
+  .stat-stack{display:flex;flex-direction:column;justify-content:center;}
+  .stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:16px 0;border-bottom:1px solid rgba(255,255,255,0.06);}
+  .stat-label{color:var(--slate-300);font-size:0.92rem;}
+  .stat-value{font-size:1.2rem;font-weight:600;color:var(--white);}
+  .stat-value small{font-size:0.68rem;font-weight:400;color:var(--slate-400);}
+
+  .section-title-sm{font-size:1.3rem;margin-bottom:18px;}
+  .cat-breakdown{display:flex;flex-direction:column;gap:22px;margin-bottom:32px;}
+  .cat-row-top{display:flex;justify-content:space-between;margin-bottom:8px;}
+  .cat-name{font-size:0.95rem;font-weight:500;}
+  .cat-val{font-size:0.9rem;color:var(--slate-300);}
+  .cat-bar-track{height:10px;border-radius:99px;background:rgba(255,255,255,0.06);overflow:hidden;}
+  .cat-bar-fill{height:100%;border-radius:99px;transition:width 1s var(--ease);}
+
+  .analysis-insight{margin-bottom:40px;border-color:rgba(16,185,129,0.25);background:rgba(16,185,129,0.05);}
+  .insight-text{font-size:1rem;line-height:1.6;color:var(--slate-200);}
+
+  .analysis-actions{display:flex;gap:14px;flex-wrap:wrap;}
+
+  .empty-state-wrap{padding:100px 0;}
+  .empty-card{max-width:480px;margin:0 auto;text-align:center;padding:48px 36px;}
+  .empty-icon{font-size:2.4rem;margin-bottom:16px;}
+  .empty-card h2{font-size:1.4rem;margin-bottom:10px;}
+  .empty-card p{color:var(--slate-400);margin-bottom:24px;line-height:1.55;}
+  `;
+  document.head.appendChild(style);
+}
+/* ============================================================
+   SCREEN: MISSIONS
+   ============================================================ */
+RENDERERS.missions = function(root){
+  if(!STATE.assessment.completed){
+    root.innerHTML = emptyState('Take the assessment first', 'Missions are personalized to your footprint, so we need your assessment results first.', 'Start assessment', ()=>navigate('assessment'));
+    return;
+  }
+  injectMissionsStyles();
+  refreshActiveMissionsIfNeeded();
+  renderMissionsContent(root);
+};
+
+function renderMissionsContent(root){
+  const active = STATE.missions.active;
+  const completed = STATE.missions.completed.slice().reverse();
+
+  root.innerHTML = `
+  <section class="wrap missions-wrap">
+    <div class="missions-header">
+      <div>
+        <div class="eyebrow">PERSONALIZED FOR YOU</div>
+        <h1 class="missions-title">Your missions</h1>
+        <p class="missions-sub">Weighted toward your highest-impact category. Complete a mission to earn points and bank a streak.</p>
+      </div>
+      <div class="missions-stats">
+        <div class="mstat"><span class="num">${completed.length}</span><span>completed</span></div>
+        <div class="mstat"><span class="num">${STATE.points.toLocaleString()}</span><span>points</span></div>
+        <div class="mstat"><span class="num">🔥 ${STATE.streak.current}</span><span>day streak</span></div>
+      </div>
+    </div>
+
+    <div class="missions-grid" id="active-missions">
+      ${active.length ? active.map(missionCardHTML).join('') : `<p class="missions-empty">No active missions — nice work clearing the board! Check back soon.</p>`}
+    </div>
+
+    ${completed.length ? `
+    <h2 class="section-title-sm" style="margin-top:48px;">Completed (${completed.length})</h2>
+    <div class="completed-list">
+      ${completed.slice(0,8).map(m=>`
+        <div class="completed-row">
+          <span class="completed-icon">${m.icon}</span>
+          <span class="completed-title">${m.title}</span>
+          <span class="num completed-pts">+${m.points} pts</span>
+          <span class="completed-date">${fmtDate(m.completedAt)}</span>
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
+  </section>
+  `;
+
+  root.querySelectorAll('[data-complete]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      completeMission(btn.dataset.complete);
+      renderMissionsContent(root);
+      renderNav();
+    });
+  });
+  root.querySelectorAll('[data-skip]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      skipMission(btn.dataset.skip);
+      renderMissionsContent(root);
+    });
+  });
+}
+
+function missionCardHTML(m){
+  return `
+  <div class="card mission-card">
+    <div class="mission-card-top">
+      <span class="mission-icon">${m.icon}</span>
+      <span class="mission-diff" style="color:${difficultyColor(m.difficulty)};border-color:${difficultyColor(m.difficulty)}55;">${m.difficulty}</span>
+    </div>
+    <h4 class="mission-title">${m.title}</h4>
+    <p class="mission-desc">${m.desc}</p>
+    <div class="mission-meta">
+      <span class="num">+${m.points} pts</span>
+      ${m.co2Saved ? `<span class="num">−${m.co2Saved} kg CO₂e</span>` : ''}
+    </div>
+    <div class="mission-actions">
+      <button class="btn btn-primary btn-sm btn-block" data-complete="${m.id}">Mark complete</button>
+      <button class="btn btn-ghost btn-sm" data-skip="${m.id}" title="Swap for another mission">Skip</button>
+    </div>
+  </div>
+  `;
+}
+
+function injectMissionsStyles(){
+  if(document.getElementById('missions-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'missions-styles';
+  style.textContent = `
+  .missions-wrap{padding:56px 0 80px;}
+  .missions-header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:24px;margin-bottom:40px;}
+  .missions-title{font-size:clamp(1.8rem,3.4vw,2.4rem);margin-bottom:8px;}
+  .missions-sub{color:var(--slate-400);max-width:480px;}
+  .missions-stats{display:flex;gap:28px;}
+  .mstat{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+  .mstat .num{font-size:1.3rem;font-weight:700;color:var(--emerald-bright);font-family:var(--font-mono);}
+  .mstat span:last-child{font-size:0.7rem;color:var(--slate-400);}
+
+  .missions-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  @media (max-width:980px){.missions-grid{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:640px){.missions-grid{grid-template-columns:1fr;}}
+  .missions-empty{color:var(--slate-400);grid-column:1/-1;text-align:center;padding:40px;}
+
+  .mission-card{display:flex;flex-direction:column;padding:22px;}
+  .mission-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .mission-icon{font-size:1.6rem;}
+  .mission-diff{font-family:var(--font-mono);font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;border:1px solid;padding:3px 9px;border-radius:99px;}
+  .mission-title{font-size:1.02rem;margin-bottom:8px;line-height:1.3;}
+  .mission-desc{font-size:0.85rem;color:var(--slate-400);line-height:1.5;flex:1;margin-bottom:16px;}
+  .mission-meta{display:flex;gap:14px;margin-bottom:16px;}
+  .mission-meta .num{font-size:0.78rem;color:var(--emerald-bright);background:rgba(16,185,129,0.1);padding:4px 10px;border-radius:99px;}
+  .mission-actions{display:flex;gap:8px;}
+
+  .completed-list{display:flex;flex-direction:column;gap:2px;}
+  .completed-row{display:grid;grid-template-columns:32px 1fr auto auto;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid rgba(255,255,255,0.05);}
+  .completed-icon{font-size:1.1rem;}
+  .completed-title{font-size:0.9rem;color:var(--slate-200);}
+  .completed-pts{font-size:0.78rem;color:var(--emerald-bright);}
+  .completed-date{font-size:0.72rem;color:var(--slate-500);font-family:var(--font-mono);}
+  @media (max-width:600px){.completed-date{display:none;}}
+  `;
+  document.head.appendChild(style);
+}
+/* ============================================================
+   SCREEN: DASHBOARD
+   ============================================================ */
+RENDERERS.dashboard = function(root){
+  if(!STATE.assessment.completed){
+    root.innerHTML = emptyState('Take the assessment first', 'Your dashboard tracks progress over time, starting with your first assessment.', 'Start assessment', ()=>navigate('assessment'));
+    return;
+  }
+  injectDashboardStyles();
+  const s = STATE.scores;
+  const unlockedAch = ACHIEVEMENTS.filter(a=>STATE.achievements.includes(a.id));
+  const lockedAch = ACHIEVEMENTS.filter(a=>!STATE.achievements.includes(a.id));
+  const totalSaved = STATE.missions.completed.reduce((a,m)=>a+(m.co2Saved||0),0);
+
+  root.innerHTML = `
+  <section class="wrap dash-wrap">
+    <div class="eyebrow">YOUR PROGRESS</div>
+    <h1 class="dash-title">Dashboard</h1>
+
+    <div class="dash-kpis">
+      <div class="card kpi-card">
+        <span class="kpi-label">EcoScore</span>
+        <span class="num kpi-value" style="color:var(--emerald-bright)">${s.total}</span>
+      </div>
+      <div class="card kpi-card">
+        <span class="kpi-label">Annual footprint</span>
+        <span class="num kpi-value">${fmtCO2(s.annualCO2)}<small>kg</small></span>
+      </div>
+      <div class="card kpi-card">
+        <span class="kpi-label">CO₂e saved via missions</span>
+        <span class="num kpi-value" style="color:var(--teal-bright)">${fmtCO2(totalSaved)}<small>kg</small></span>
+      </div>
+      <div class="card kpi-card">
+        <span class="kpi-label">Current streak</span>
+        <span class="num kpi-value" style="color:var(--amber-bright)">🔥 ${STATE.streak.current}</span>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card chart-card">
+        <h3 class="card-title">EcoScore trend</h3>
+        <div id="trend-chart"></div>
+      </div>
+      <div class="card breakdown-mini-card">
+        <h3 class="card-title">Category split</h3>
+        <div id="donut-chart"></div>
+      </div>
+    </div>
+
+    <h2 class="section-title-sm" style="margin-top:44px;">Achievements <span class="ach-count">${unlockedAch.length}/${ACHIEVEMENTS.length}</span></h2>
+    <div class="achievements-grid">
+      ${unlockedAch.map(a=>`
+        <div class="ach-badge unlocked" title="${a.desc}">
+          <span class="ach-icon">${a.icon}</span>
+          <span class="ach-title">${a.title}</span>
+        </div>
+      `).join('')}
+      ${lockedAch.map(a=>`
+        <div class="ach-badge locked" title="${a.desc}">
+          <span class="ach-icon">🔒</span>
+          <span class="ach-title">${a.title}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="dash-cta-row">
+      <button class="btn btn-primary" id="dash-to-reports">Generate weekly report →</button>
+      <button class="btn btn-ghost" id="dash-to-missions">View missions</button>
+    </div>
+  </section>
+  `;
+
+  renderTrendChart(document.getElementById('trend-chart'));
+  renderDonutChart(document.getElementById('donut-chart'));
+
+  root.querySelector('#dash-to-reports').addEventListener('click', ()=>navigate('reports'));
+  root.querySelector('#dash-to-missions').addEventListener('click', ()=>navigate('missions'));
+};
+
+function renderTrendChart(container){
+  const hist = STATE.history.slice(-12);
+  if(hist.length < 2){
+    container.innerHTML = `<p class="chart-empty">Complete more missions and check back to see your trend over time.</p>`;
+    return;
+  }
+  const w = 520, h = 200, pad = 30;
+  const scores = hist.map(h=>h.score);
+  const min = Math.min(...scores) - 5, max = Math.max(...scores) + 5;
+  const points = hist.map((pt,i)=>{
+    const x = pad + (i/(hist.length-1)) * (w - pad*2);
+    const y = h - pad - ((pt.score-min)/(max-min)) * (h - pad*2);
+    return [x,y];
+  });
+  const pathD = points.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const areaD = pathD + ` L${points[points.length-1][0]},${h-pad} L${points[0][0]},${h-pad} Z`;
+
+  container.innerHTML = `
+  <svg viewBox="0 0 ${w} ${h}" class="trend-svg">
+    <defs>
+      <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#34D399" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="#34D399" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${areaD}" fill="url(#trendFill)"/>
+    <path d="${pathD}" fill="none" stroke="#34D399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    ${points.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#0A0F0D" stroke="#34D399" stroke-width="2"/>`).join('')}
+  </svg>
+  <div class="trend-labels">
+    <span>${fmtDate(hist[0].date)}</span>
+    <span>${fmtDate(hist[hist.length-1].date)}</span>
+  </div>
+  `;
+}
+
+function renderDonutChart(container){
+  const cats = Object.entries(STATE.scores.categories);
+  const total = cats.reduce((a,[,v])=>a+v,0);
+  const colors = {transport:'#34D399', home:'#2DD4BF', food:'#FFC857', consumption:'#FF6B5E'};
+  let offset = 0;
+  const r = 70, circumference = 2*Math.PI*r;
+  const segments = cats.map(([cat,val])=>{
+    const frac = val/total;
+    const dash = frac*circumference;
+    const seg = `<circle cx="100" cy="100" r="${r}" fill="none" stroke="${colors[cat]}" stroke-width="26"
+      stroke-dasharray="${dash} ${circumference-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 100 100)"/>`;
+    offset += dash;
+    return seg;
+  }).join('');
+
+  container.innerHTML = `
+  <div class="donut-row">
+    <svg viewBox="0 0 200 200" class="donut-svg">${segments}</svg>
+    <div class="donut-legend">
+      ${cats.map(([cat,val])=>`
+        <div class="legend-item">
+          <span class="legend-dot" style="background:${colors[cat]}"></span>
+          <span class="legend-label">${CATEGORY_LABEL[cat]}</span>
+          <span class="num legend-pct">${Math.round((val/total)*100)}%</span>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+  `;
+}
+
+function injectDashboardStyles(){
+  if(document.getElementById('dash-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'dash-styles';
+  style.textContent = `
+  .dash-wrap{padding:56px 0 80px;}
+  .dash-title{font-size:clamp(1.8rem,3.4vw,2.4rem);margin-bottom:32px;}
+
+  .dash-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+  @media (max-width:860px){.dash-kpis{grid-template-columns:repeat(2,1fr);}}
+  .kpi-card{display:flex;flex-direction:column;gap:8px;padding:22px;}
+  .kpi-label{font-size:0.78rem;color:var(--slate-400);}
+  .kpi-value{font-size:1.7rem;font-weight:700;color:var(--white);}
+  .kpi-value small{font-size:0.6em;color:var(--slate-400);margin-left:4px;font-weight:400;}
+
+  .dash-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-top:8px;}
+  @media (max-width:860px){.dash-grid{grid-template-columns:1fr;}}
+  .card-title{font-size:1rem;margin-bottom:18px;}
+  .trend-svg{width:100%;height:auto;}
+  .trend-labels{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--font-mono);font-size:0.7rem;color:var(--slate-500);}
+  .chart-empty{color:var(--slate-400);font-size:0.88rem;padding:40px 0;text-align:center;}
+
+  .donut-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+  .donut-svg{width:140px;height:140px;flex-shrink:0;}
+  .donut-legend{flex:1;display:flex;flex-direction:column;gap:10px;min-width:140px;}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:0.82rem;}
+  .legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .legend-label{flex:1;color:var(--slate-300);}
+  .legend-pct{color:var(--slate-400);}
+
+  .ach-count{font-family:var(--font-mono);font-size:0.85rem;color:var(--slate-400);font-weight:400;}
+  .achievements-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+  .ach-badge{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:18px 12px;border-radius:var(--radius-md);border:1px solid rgba(255,255,255,0.08);}
+  .ach-badge.unlocked{background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.3);}
+  .ach-badge.locked{opacity:0.45;}
+  .ach-icon{font-size:1.5rem;}
+  .ach-title{font-size:0.74rem;color:var(--slate-200);line-height:1.3;}
+
+  .dash-cta-row{display:flex;gap:14px;margin-top:44px;flex-wrap:wrap;}
+  `;
+  document.head.appendChild(style);
+}
+/* ============================================================
+   SCREEN: REPORTS
+   ============================================================ */
+RENDERERS.reports = function(root){
+  if(!STATE.assessment.completed){
+    root.innerHTML = emptyState('Take the assessment first', 'Weekly reports summarize your progress once you have a baseline.', 'Start assessment', ()=>navigate('assessment'));
+    return;
+  }
+  injectReportsStyles();
+  renderReportsContent(root);
+};
+
+function renderReportsContent(root){
+  const reports = STATE.reports;
+  root.innerHTML = `
+  <section class="wrap reports-wrap">
+    <div class="reports-header">
+      <div>
+        <div class="eyebrow">WEEKLY SUMMARIES</div>
+        <h1 class="reports-title">Reports</h1>
+        <p class="reports-sub">A snapshot of your impact and momentum, generated on demand.</p>
+      </div>
+      <button class="btn btn-primary" id="gen-report">Generate this week's report</button>
+    </div>
+
+    <div id="reports-list">
+      ${reports.length ? reports.map(reportCardHTML).join('') : `
+        <div class="card empty-card" style="max-width:100%;text-align:left;padding:40px;">
+          <div class="empty-icon">🗞️</div>
+          <h2>No reports yet</h2>
+          <p>Generate your first weekly report to see a summary of your missions, points and CO₂e saved.</p>
+        </div>
+      `}
+    </div>
+  </section>
+  `;
+
+  root.querySelector('#gen-report').addEventListener('click', ()=>{
+    generateReport();
+    toast('Weekly report generated', {icon:'🗞️'});
+    renderReportsContent(root);
+  });
+}
+
+function reportCardHTML(r){
+  const deltaPositive = r.delta <= 0;
+  return `
+  <div class="card report-card">
+    <div class="report-card-head">
+      <span class="report-date">${fmtDate(r.date)}</span>
+      <span class="report-score">EcoScore <strong class="num">${r.score}</strong></span>
+    </div>
+    <div class="report-grid">
+      <div class="report-stat">
+        <span class="report-stat-label">Missions completed</span>
+        <span class="num report-stat-value">${r.missionsCompleted}</span>
+      </div>
+      <div class="report-stat">
+        <span class="report-stat-label">CO₂e saved this week</span>
+        <span class="num report-stat-value" style="color:var(--emerald-bright)">${r.co2Saved} kg</span>
+      </div>
+      <div class="report-stat">
+        <span class="report-stat-label">Points earned</span>
+        <span class="num report-stat-value">+${r.pointsEarned}</span>
+      </div>
+      <div class="report-stat">
+        <span class="report-stat-label">Footprint change</span>
+        <span class="num report-stat-value" style="color:${deltaPositive?'var(--emerald-bright)':'var(--coral)'}">${deltaPositive?'−':'+'}${Math.abs(r.delta)} kg</span>
+      </div>
+    </div>
+    <p class="report-summary">${reportSummaryText(r)}</p>
+  </div>
+  `;
+}
+
+function reportSummaryText(r){
+  if(r.missionsCompleted===0){
+    return `No missions completed this week. Your ${CATEGORY_LABEL[r.topCategory]} category remains your biggest opportunity — even one small action would move the needle.`;
+  }
+  return `You completed ${r.missionsCompleted} mission${r.missionsCompleted===1?'':'s'} this week, saving an estimated ${r.co2Saved} kg CO₂e and earning ${r.pointsEarned} points. ${CATEGORY_LABEL[r.topCategory]} is still your highest-impact category — keep prioritizing missions there for the fastest score improvement.`;
+}
+
+function injectReportsStyles(){
+  if(document.getElementById('reports-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'reports-styles';
+  style.textContent = `
+  .reports-wrap{padding:56px 0 80px;}
+  .reports-header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:20px;margin-bottom:40px;}
+  .reports-title{font-size:clamp(1.8rem,3.4vw,2.4rem);margin-bottom:8px;}
+  .reports-sub{color:var(--slate-400);max-width:440px;}
+
+  #reports-list{display:flex;flex-direction:column;gap:16px;}
+  .report-card{padding:26px;}
+  .report-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .report-date{font-family:var(--font-mono);font-size:0.8rem;color:var(--slate-400);}
+  .report-score{font-size:0.88rem;color:var(--slate-300);}
+  .report-score strong{color:var(--emerald-bright);font-size:1.1rem;}
+  .report-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px;}
+  @media (max-width:640px){.report-grid{grid-template-columns:repeat(2,1fr);}}
+  .report-stat{display:flex;flex-direction:column;gap:4px;}
+  .report-stat-label{font-size:0.72rem;color:var(--slate-400);}
+  .report-stat-value{font-size:1.15rem;font-weight:700;}
+  .report-summary{font-size:0.88rem;color:var(--slate-300);line-height:1.6;}
+  `;
+  document.head.appendChild(style);
+}
+/* ============================================================
+   SCREEN: AI CHAT (Sustainability Coach)
+   ============================================================ */
+const SUGGESTED_PROMPTS = [
+  "How am I doing overall?",
+  "How can I reduce my transport footprint?",
+  "What should I focus on this week?",
+  "What's my footprint equivalent to?",
+];
+
+RENDERERS.chat = function(root){
+  injectChatStyles();
+  root.innerHTML = `
+  <section class="wrap chat-wrap">
+    <div class="eyebrow">AI SUSTAINABILITY COACH</div>
+    <h1 class="chat-title">Ask EcoPilot</h1>
+    <p class="chat-sub">Grounded in your actual assessment data — ask about any category, your score, or what to do next.</p>
+
+    <div class="chat-shell card">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-suggestions" id="chat-suggestions"></div>
+      <form class="chat-input-row" id="chat-form">
+        <input type="text" id="chat-input" placeholder="${STATE.assessment.completed ? 'Ask about your footprint…' : 'Complete your assessment to unlock personalized coaching…'}" autocomplete="off" />
+        <button type="submit" class="btn btn-primary btn-icon" aria-label="Send">→</button>
+      </form>
+    </div>
+  </section>
+  `;
+
+  renderChatMessages();
+  renderChatSuggestions();
+
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('chat-input');
+  form.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const val = input.value;
+    if(!val.trim()) return;
+    input.value = '';
+    sendChatMessage(val);
+  });
+};
+
+function renderChatSuggestions(){
+  const el = document.getElementById('chat-suggestions');
+  if(!el) return;
+  if(STATE.chat.length > 0){ el.innerHTML=''; return; }
+  el.innerHTML = SUGGESTED_PROMPTS.map(p=>`<button class="chip" data-prompt="${p}">${p}</button>`).join('');
+  el.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>sendChatMessage(chip.dataset.prompt));
+  });
+}
+
+function renderChatMessages(){
+  const container = document.getElementById('chat-messages');
+  if(!container) return;
+  if(STATE.chat.length === 0){
+    container.innerHTML = `
+      <div class="chat-msg coach">
+        <div class="chat-avatar">🌱</div>
+        <div class="chat-bubble">${STATE.assessment.completed
+          ? "Hi! I'm your sustainability coach. I can see your full carbon profile — ask me anything about your score, categories, or what to tackle next."
+          : "Hi! I'll be able to give you specific, personalized guidance once you've completed the carbon assessment. Want to start it now?"}</div>
+      </div>
+    `;
+    if(!STATE.assessment.completed){
+      const startBtn = document.createElement('button');
+      startBtn.className = 'btn btn-primary btn-sm';
+      startBtn.style.marginTop = '12px';
+      startBtn.textContent = 'Start assessment';
+      startBtn.addEventListener('click', ()=>navigate('assessment'));
+      container.appendChild(startBtn);
+    }
+    return;
+  }
+  container.innerHTML = STATE.chat.map(m=>`
+    <div class="chat-msg ${m.role==='user'?'user':'coach'}">
+      ${m.role==='coach' ? '<div class="chat-avatar">🌱</div>' : ''}
+      <div class="chat-bubble">${escapeHTML(m.text)}</div>
+    </div>
+  `).join('');
+  container.scrollTop = container.scrollHeight;
+  renderChatSuggestions();
+}
+
+function showTypingIndicator(){
+  const container = document.getElementById('chat-messages');
+  if(!container) return null;
+  const id = 'typing-'+Date.now();
+  const div = document.createElement('div');
+  div.className = 'chat-msg coach';
+  div.id = id;
+  div.innerHTML = `<div class="chat-avatar">🌱</div><div class="chat-bubble typing"><span></span><span></span><span></span></div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return id;
+}
+function removeTypingIndicator(id){
+  if(!id) return;
+  const el = document.getElementById(id);
+  if(el) el.remove();
+}
+
+function escapeHTML(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function injectChatStyles(){
+  if(document.getElementById('chat-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'chat-styles';
+  style.textContent = `
+  .chat-wrap{padding:56px 0 60px;}
+  .chat-title{font-size:clamp(1.8rem,3.4vw,2.4rem);margin-bottom:8px;}
+  .chat-sub{color:var(--slate-400);max-width:480px;margin-bottom:32px;}
+
+  .chat-shell{padding:0;display:flex;flex-direction:column;height:560px;overflow:hidden;}
+  .chat-messages{flex:1;overflow-y:auto;padding:28px;display:flex;flex-direction:column;gap:18px;}
+  .chat-msg{display:flex;gap:10px;align-items:flex-start;max-width:80%;}
+  .chat-msg.user{align-self:flex-end;flex-direction:row-reverse;}
+  .chat-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--emerald-bright),var(--teal));display:flex;align-items:center;justify-content:center;font-size:0.95rem;flex-shrink:0;}
+  .chat-bubble{padding:13px 17px;border-radius:16px;font-size:0.9rem;line-height:1.55;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:var(--slate-100);}
+  .chat-msg.coach .chat-bubble{border-bottom-left-radius:4px;}
+  .chat-msg.user .chat-bubble{background:linear-gradient(135deg,rgba(16,185,129,0.25),rgba(20,184,166,0.18));border-color:rgba(16,185,129,0.35);border-bottom-right-radius:4px;}
+
+  .chat-bubble.typing{display:flex;gap:4px;padding:16px 18px;}
+  .chat-bubble.typing span{width:6px;height:6px;border-radius:50%;background:var(--slate-400);animation:typingBounce 1.2s infinite ease-in-out;}
+  .chat-bubble.typing span:nth-child(2){animation-delay:.15s;}
+  .chat-bubble.typing span:nth-child(3){animation-delay:.3s;}
+  @keyframes typingBounce{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-4px);opacity:1;}}
+
+  .chat-suggestions{display:flex;flex-wrap:wrap;gap:8px;padding:0 28px 16px;}
+  .chip{font-size:0.8rem;padding:9px 15px;border-radius:99px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);color:var(--emerald-bright);transition:all .2s var(--ease);}
+  .chip:hover{background:rgba(16,185,129,0.16);}
+
+  .chat-input-row{display:flex;gap:10px;padding:18px 20px;border-top:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.02);}
+  .chat-input-row input{
+    flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:99px;
+    padding:13px 20px;color:var(--white);font-family:var(--font-body);font-size:0.9rem;
+  }
+  .chat-input-row input:focus{outline:2px solid var(--emerald-bright);outline-offset:1px;}
+  .chat-input-row input::placeholder{color:var(--slate-500);}
+  @media (max-width:600px){.chat-shell{height:65vh;}.chat-messages{padding:20px;}.chat-msg{max-width:92%;}}
+  `;
+  document.head.appendChild(style);
+}
+
+</script>
+</body>
+</html>
